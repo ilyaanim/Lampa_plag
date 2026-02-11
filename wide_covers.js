@@ -1,8 +1,6 @@
 (function () {
     'use strict';
 
-    var BASE = 'https://image.tmdb.org/t/p/';
-
     // ==========================================
     //  1. CSS: backdrop с градиентом, текст поверх
     // ==========================================
@@ -67,143 +65,91 @@
     document.head.appendChild(style);
 
     // ==========================================
-    //  2. Получить URL backdrop
+    //  2. Построить URL через Lampa API (с прокси)
     // ==========================================
-    function getBackdropUrl(movie) {
-        if (!movie) return '';
-
-        // Если есть массив backdrops — берём самый большой
-        if (movie.images && movie.images.backdrops && movie.images.backdrops.length) {
-            var sorted = movie.images.backdrops.slice().sort(function (a, b) {
-                return (b.width || 0) - (a.width || 0);
-            });
-            return BASE + 'original' + sorted[0].file_path;
-        }
-
-        if (movie.backdrop_path) {
-            return BASE + 'original' + movie.backdrop_path;
-        }
-
-        return '';
+    function buildImgUrl(path, size) {
+        if (!path) return '';
+        size = size || 'original';
+        try {
+            // Lampa.Api.img() — правильный способ, учитывает прокси
+            return Lampa.Api.img(path, size);
+        } catch (e) {}
+        try {
+            return Lampa.TMDB.image('t/p/' + size + path);
+        } catch (e) {}
+        return 'https://image.tmdb.org/t/p/' + size + path;
     }
 
     // ==========================================
-    //  3. Мгновенный перехват: когда Lampa ставит
-    //     poster src — сразу меняем на backdrop
-    // ==========================================
-    var srcObserver = new MutationObserver(function (mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-            var m = mutations[i];
-            if (m.attributeName !== 'src') continue;
-
-            var img = m.target;
-            if (!img.classList || !img.classList.contains('full--poster')) continue;
-            if (img.getAttribute('data-wide-done')) continue;
-
-            var src = img.getAttribute('src') || '';
-
-            // Пропускаем placeholder и broken
-            if (!src || src.indexOf('img_load') !== -1 || src.indexOf('img_broken') !== -1) continue;
-
-            // Получаем данные фильма
-            var movie = null;
-            try {
-                var act = Lampa.Activity.active();
-                movie = act && act.params ? act.params.movie : null;
-            } catch (e) {
-                continue;
-            }
-
-            if (!movie) continue;
-
-            var backdropUrl = getBackdropUrl(movie);
-            if (!backdropUrl) continue;
-
-            // Проверяем: src уже backdrop? Не меняем.
-            if (movie.backdrop_path && src.indexOf(movie.backdrop_path) !== -1) continue;
-
-            // Меняем на backdrop сразу
-            img.setAttribute('data-wide-done', '1');
-
-            img.onload = function () {
-                var p = this.closest('.full-start-new__poster');
-                if (p) p.classList.add('loaded');
-            };
-
-            img.onerror = function () {
-                // Fallback: w1280
-                if (movie.backdrop_path) {
-                    this.onerror = function () {};
-                    this.src = BASE + 'w1280' + movie.backdrop_path;
-                }
-            };
-
-            img.src = backdropUrl;
-        }
-    });
-
-    srcObserver.observe(document.body, {
-        attributes: true,
-        attributeFilter: ['src'],
-        subtree: true
-    });
-
-    // ==========================================
-    //  4. Fallback: если перехват не сработал
+    //  3. Подмена постера на backdrop
     // ==========================================
     function swapPoster() {
-        var imgs = document.querySelectorAll('.full-start-new .full--poster');
+        var img = document.querySelector('.full-start-new .full--poster');
+        if (!img) return false;
+        if (img.getAttribute('data-wide-done') === '1') return true;
 
-        for (var i = 0; i < imgs.length; i++) {
-            var img = imgs[i];
-            if (img.getAttribute('data-wide-done')) continue;
-
-            var movie = null;
-            try {
-                var act = Lampa.Activity.active();
-                movie = act && act.params ? act.params.movie : null;
-            } catch (e) {
-                continue;
-            }
-
-            var backdropUrl = getBackdropUrl(movie);
-            if (!backdropUrl) continue;
-
-            img.setAttribute('data-wide-done', '1');
-
-            img.onload = function () {
-                var p = this.closest('.full-start-new__poster');
-                if (p) p.classList.add('loaded');
-            };
-
-            img.onerror = function () {
-                if (movie && movie.backdrop_path) {
-                    this.onerror = function () {};
-                    this.src = BASE + 'w1280' + movie.backdrop_path;
-                }
-            };
-
-            img.src = backdropUrl;
+        var movie = null;
+        try {
+            var act = Lampa.Activity.active();
+            movie = act && act.params ? act.params.movie : null;
+        } catch (e) {
+            return false;
         }
+
+        if (!movie || !movie.backdrop_path) return false;
+
+        img.setAttribute('data-wide-done', '1');
+
+        // original → w1280 fallback
+        var urlOriginal = buildImgUrl(movie.backdrop_path, 'original');
+        var urlFallback = buildImgUrl(movie.backdrop_path, 'w1280');
+
+        img.onload = function () {
+            var p = this.closest('.full-start-new__poster');
+            if (p) p.classList.add('loaded');
+        };
+
+        img.onerror = function () {
+            this.onerror = function () {};
+            this.src = urlFallback;
+        };
+
+        img.src = urlOriginal;
+
+        return true;
     }
 
+    // ==========================================
+    //  4. Агрессивный retry пока не сработает
+    // ==========================================
+    function trySwapWithRetry(attempts, delay) {
+        if (attempts <= 0) return;
+        if (swapPoster()) return;
+
+        setTimeout(function () {
+            trySwapWithRetry(attempts - 1, delay);
+        }, delay);
+    }
+
+    // ==========================================
+    //  5. Listeners
+    // ==========================================
     function initListeners() {
         Lampa.Listener.follow('full', function (e) {
             if (e.type === 'complite') {
-                setTimeout(swapPoster, 50);
-                setTimeout(swapPoster, 300);
+                trySwapWithRetry(10, 100);
             }
         });
 
         Lampa.Listener.follow('activity', function (e) {
             if (e.type === 'start') {
-                setTimeout(swapPoster, 200);
+                trySwapWithRetry(10, 150);
             }
         });
     }
 
     // ==========================================
-    //  5. Start
+    //  6. Start
     // ==========================================
     if (window.appready) {
         initListeners();
