@@ -83,6 +83,11 @@
         // --- Кнопки: текст всегда видим ---
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
+        '}',
+
+        // --- Скрыть реакции ---
+        '.full-start-new__reactions {',
+        '  display: none !important;',
         '}'
     ].join('\n');
     document.head.appendChild(style);
