@@ -268,21 +268,22 @@
         if (lang !== 'en') doFetch('en');
     }
 
-    function findBestTrailer(videos) {
-        // Приоритет: официальный трейлер → любой трейлер → тизер → любое видео
+    function sortTrailers(videos) {
+        // Сортируем YouTube видео по приоритету
         var yt = videos.filter(function (v) { return v.site === 'YouTube'; });
-        if (!yt.length) return null;
+        if (!yt.length) return [];
 
-        var official = yt.filter(function (v) { return v.type === 'Trailer' && v.official; });
-        if (official.length) return official[official.length - 1]; // последний = самый свежий
+        // Категории: официальный трейлер → трейлер → тизер → остальное
+        var scored = yt.map(function (v) {
+            var s = 0;
+            if (v.type === 'Trailer') s += 10;
+            if (v.type === 'Teaser') s += 5;
+            if (v.official) s += 3;
+            return { video: v, score: s };
+        });
 
-        var trailers = yt.filter(function (v) { return v.type === 'Trailer'; });
-        if (trailers.length) return trailers[trailers.length - 1];
-
-        var teasers = yt.filter(function (v) { return v.type === 'Teaser'; });
-        if (teasers.length) return teasers[teasers.length - 1];
-
-        return yt[yt.length - 1];
+        scored.sort(function (a, b) { return b.score - a.score; });
+        return scored.map(function (s) { return s.video; });
     }
 
     function loadTrailer() {
@@ -298,39 +299,73 @@
         trailerState.active = true;
 
         fetchTrailers(movie.id, mediaType, function (videos) {
-            if (!trailerState.active) return; // ушли со страницы
+            if (!trailerState.active) return;
 
-            var best = findBestTrailer(videos);
-            if (!best) return;
+            var sorted = sortTrailers(videos);
+            if (!sorted.length) return;
 
-            var videoId = best.key;
-
-            // Создаём обёртку с iframe
-            var wrap = document.createElement('div');
-            wrap.className = 'wide-trailer-wrap';
-
-            var iframe = document.createElement('iframe');
-            iframe.setAttribute('src',
-                'https://www.youtube.com/embed/' + videoId +
-                '?autoplay=1&mute=1&controls=0&showinfo=0&rel=0' +
-                '&modestbranding=1&playsinline=1&loop=1' +
-                '&playlist=' + videoId +
-                '&start=0&iv_load_policy=3&disablekb=1'
-            );
-            iframe.setAttribute('allow', 'autoplay; encrypted-media');
-            iframe.setAttribute('allowfullscreen', '');
-
-            wrap.appendChild(iframe);
-            poster.appendChild(wrap);
-            trailerState.wrap = wrap;
-
-            // Буфер 5 секунд, затем показываем трейлер
-            trailerState.timer = setTimeout(function () {
-                if (!trailerState.active) return;
-                wrap.classList.add('visible');
-                poster.classList.add('trailer-playing');
-            }, 5000);
+            tryEmbedTrailer(poster, sorted, 0);
         });
+    }
+
+    function tryEmbedTrailer(poster, trailerList, index) {
+        if (index >= trailerList.length || index >= 3) return; // макс 3 попытки
+        if (!trailerState.active) return;
+
+        var videoId = trailerList[index].key;
+        var origin = window.location.origin || window.location.protocol + '//' + window.location.host;
+
+        var wrap = document.createElement('div');
+        wrap.className = 'wide-trailer-wrap';
+
+        var iframe = document.createElement('iframe');
+        iframe.setAttribute('src',
+            'https://www.youtube-nocookie.com/embed/' + videoId +
+            '?autoplay=1&mute=1&controls=0&showinfo=0&rel=0' +
+            '&modestbranding=1&playsinline=1' +
+            '&iv_load_policy=3&disablekb=1' +
+            '&origin=' + encodeURIComponent(origin) +
+            '&enablejsapi=1'
+        );
+        iframe.setAttribute('allow', 'autoplay; encrypted-media');
+        iframe.setAttribute('allowfullscreen', '');
+
+        wrap.appendChild(iframe);
+        poster.appendChild(wrap);
+        trailerState.wrap = wrap;
+
+        // Слушаем сообщения от YouTube IFrame API об ошибках
+        var errorHandler = function (event) {
+            try {
+                var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                if (data && data.event === 'onError') {
+                    // Ошибка — убираем и пробуем следующий трейлер
+                    window.removeEventListener('message', errorHandler);
+                    if (trailerState.wrap === wrap) {
+                        wrap.remove();
+                        trailerState.wrap = null;
+                        if (trailerState.timer) {
+                            clearTimeout(trailerState.timer);
+                            trailerState.timer = null;
+                        }
+                        tryEmbedTrailer(poster, trailerList, index + 1);
+                    }
+                }
+            } catch (e) {}
+        };
+        window.addEventListener('message', errorHandler);
+
+        // Буфер 5 секунд, затем показываем
+        trailerState.timer = setTimeout(function () {
+            if (!trailerState.active) return;
+            if (trailerState.wrap !== wrap) return;
+            wrap.classList.add('visible');
+            poster.classList.add('trailer-playing');
+            // Убираем error listener после успешного показа
+            setTimeout(function () {
+                window.removeEventListener('message', errorHandler);
+            }, 3000);
+        }, 5000);
     }
 
     function destroyTrailer() {
