@@ -2,8 +2,7 @@
     'use strict';
 
     // ==========================================
-    //  1. CSS: backdrop с градиентом, текст поверх,
-    //     кнопка воспроизведения у заголовка
+    //  1. CSS
     // ==========================================
     var style = document.createElement('style');
     style.id = 'wide-covers-plugin-style';
@@ -54,7 +53,7 @@
         '  padding-right: 1.5em !important;',
         '}',
 
-        // --- Выровнять секции ниже постера по тому же отступу ---
+        // --- Выровнять секции ниже постера ---
         '.full-start-new ~ div,',
         '.full-start-new ~ section {',
         '  padding-left: 1.5em !important;',
@@ -75,13 +74,13 @@
         '  padding-bottom: 1em !important;',
         '}',
 
-        // --- Blur на фоновый backdrop под постером ---
+        // --- Blur на фоновый backdrop ---
         '.full-start__background {',
         '  filter: blur(20px) brightness(0.4) !important;',
         '  -webkit-filter: blur(20px) brightness(0.4) !important;',
         '}',
 
-        // --- Кнопки: текст видим только у Play ---
+        // --- Кнопки ---
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
         '}',
@@ -92,6 +91,38 @@
         // --- Скрыть реакции ---
         '.full-start-new__reactions {',
         '  display: none !important;',
+        '}',
+
+        // --- Trailer iframe поверх постера ---
+        '.wide-trailer-wrap {',
+        '  position: absolute !important;',
+        '  top: 0 !important;',
+        '  left: 0 !important;',
+        '  width: 100% !important;',
+        '  height: 100% !important;',
+        '  z-index: 0 !important;',
+        '  overflow: hidden !important;',
+        '  border-top-left-radius: 2em !important;',
+        '  border-top-right-radius: 2em !important;',
+        '  opacity: 0 !important;',
+        '  transition: opacity 1s ease !important;',
+        '}',
+        '.wide-trailer-wrap.visible {',
+        '  opacity: 1 !important;',
+        '}',
+        '.wide-trailer-wrap iframe {',
+        '  position: absolute !important;',
+        '  top: -60px !important;',
+        '  left: 0 !important;',
+        '  width: 100% !important;',
+        '  height: calc(100% + 120px) !important;',
+        '  border: none !important;',
+        '  pointer-events: none !important;',
+        '}',
+        // Постер fade out когда трейлер играет
+        '.full-start-new__poster.trailer-playing .full-start-new__img {',
+        '  opacity: 0 !important;',
+        '  transition: opacity 1s ease !important;',
         '}'
     ].join('\n');
     document.head.appendChild(style);
@@ -109,6 +140,19 @@
             if (act.data && act.data.movie && act.data.movie.backdrop_path) return act.data.movie;
         } catch (e) {}
         return null;
+    }
+
+    function getMediaType() {
+        try {
+            var act = Lampa.Activity.active();
+            if (act && act.method) return act.method;
+            var movie = getMovie();
+            if (movie) {
+                if (movie.media_type) return movie.media_type;
+                if (movie.first_air_date) return 'tv';
+            }
+        } catch (e) {}
+        return 'movie';
     }
 
     // ==========================================
@@ -163,10 +207,8 @@
         var reactions = fullNew.querySelector('.full-start-new__reactions');
         if (!buttons || !reactions) return false;
 
-        // Уже перемещён?
         if (buttons.getAttribute('data-wide-moved') === '1') return true;
 
-        // Вставляем кнопки перед реакциями
         reactions.parentNode.insertBefore(buttons, reactions);
         buttons.setAttribute('data-wide-moved', '1');
 
@@ -174,31 +216,191 @@
     }
 
     // ==========================================
-    //  5. Retry
+    //  5. Трейлер: загрузка и воспроизведение
+    // ==========================================
+    var trailerState = {
+        wrap: null,
+        timer: null,
+        active: false
+    };
+
+    function fetchTrailers(movieId, mediaType, callback) {
+        var apiKey = '4ef0d7355d9ffb5151e987764708ce96';
+        try {
+            if (window.Lampa && Lampa.TMDB && Lampa.TMDB.key) apiKey = Lampa.TMDB.key();
+        } catch (e) {}
+
+        var lang = 'ru';
+        try {
+            if (window.Lampa && Lampa.Storage && Lampa.Storage.field) {
+                lang = Lampa.Storage.field('tmdb_lang') || 'ru';
+            }
+        } catch (e) {}
+
+        var results = [];
+        var done = 0;
+        var total = lang === 'en' ? 1 : 2;
+
+        function finish() {
+            done++;
+            if (done >= total) callback(results);
+        }
+
+        function doFetch(lng) {
+            var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movieId + '/videos?api_key=' + apiKey + '&language=' + lng;
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url);
+            xhr.timeout = 8000;
+            xhr.onload = function () {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.results && data.results.length) {
+                        results = results.concat(data.results);
+                    }
+                } catch (e) {}
+                finish();
+            };
+            xhr.onerror = xhr.ontimeout = function () { finish(); };
+            xhr.send();
+        }
+
+        doFetch(lang);
+        if (lang !== 'en') doFetch('en');
+    }
+
+    function findBestTrailer(videos) {
+        // Приоритет: официальный трейлер → любой трейлер → тизер → любое видео
+        var yt = videos.filter(function (v) { return v.site === 'YouTube'; });
+        if (!yt.length) return null;
+
+        var official = yt.filter(function (v) { return v.type === 'Trailer' && v.official; });
+        if (official.length) return official[official.length - 1]; // последний = самый свежий
+
+        var trailers = yt.filter(function (v) { return v.type === 'Trailer'; });
+        if (trailers.length) return trailers[trailers.length - 1];
+
+        var teasers = yt.filter(function (v) { return v.type === 'Teaser'; });
+        if (teasers.length) return teasers[teasers.length - 1];
+
+        return yt[yt.length - 1];
+    }
+
+    function loadTrailer() {
+        var poster = document.querySelector('.full-start-new__poster');
+        if (!poster) return;
+        if (poster.querySelector('.wide-trailer-wrap')) return;
+
+        var movie = getMovie();
+        if (!movie || !movie.id) return;
+
+        var mediaType = getMediaType();
+
+        trailerState.active = true;
+
+        fetchTrailers(movie.id, mediaType, function (videos) {
+            if (!trailerState.active) return; // ушли со страницы
+
+            var best = findBestTrailer(videos);
+            if (!best) return;
+
+            var videoId = best.key;
+
+            // Создаём обёртку с iframe
+            var wrap = document.createElement('div');
+            wrap.className = 'wide-trailer-wrap';
+
+            var iframe = document.createElement('iframe');
+            iframe.setAttribute('src',
+                'https://www.youtube.com/embed/' + videoId +
+                '?autoplay=1&mute=1&controls=0&showinfo=0&rel=0' +
+                '&modestbranding=1&playsinline=1&loop=1' +
+                '&playlist=' + videoId +
+                '&start=0&iv_load_policy=3&disablekb=1'
+            );
+            iframe.setAttribute('allow', 'autoplay; encrypted-media');
+            iframe.setAttribute('allowfullscreen', '');
+
+            wrap.appendChild(iframe);
+            poster.appendChild(wrap);
+            trailerState.wrap = wrap;
+
+            // Буфер 5 секунд, затем показываем трейлер
+            trailerState.timer = setTimeout(function () {
+                if (!trailerState.active) return;
+                wrap.classList.add('visible');
+                poster.classList.add('trailer-playing');
+            }, 5000);
+        });
+    }
+
+    function destroyTrailer() {
+        trailerState.active = false;
+
+        if (trailerState.timer) {
+            clearTimeout(trailerState.timer);
+            trailerState.timer = null;
+        }
+
+        if (trailerState.wrap) {
+            // Удаляем iframe — останавливает загрузку и освобождает память
+            var iframe = trailerState.wrap.querySelector('iframe');
+            if (iframe) iframe.setAttribute('src', '');
+            trailerState.wrap.remove();
+            trailerState.wrap = null;
+        }
+
+        // Убираем класс с постера
+        var poster = document.querySelector('.full-start-new__poster');
+        if (poster) poster.classList.remove('trailer-playing');
+    }
+
+    // ==========================================
+    //  6. Retry
     // ==========================================
     function trySwap(attemptsLeft) {
         if (attemptsLeft <= 0) return;
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
-        if (posterDone && btnDone) return;
+        if (posterDone && btnDone) {
+            // Постер готов — запускаем трейлер
+            loadTrailer();
+            return;
+        }
         setTimeout(function () { trySwap(attemptsLeft - 1); }, 150);
     }
 
     // ==========================================
-    //  6. Listeners
+    //  7. Listeners
     // ==========================================
     function initListeners() {
         Lampa.Listener.follow('full', function (e) {
-            if (e.type === 'complite') trySwap(20);
+            if (e.type === 'complite') {
+                destroyTrailer();
+                trySwap(20);
+            }
         });
 
         Lampa.Listener.follow('activity', function (e) {
-            if (e.type === 'start') trySwap(20);
+            if (e.type === 'start') {
+                destroyTrailer();
+                trySwap(20);
+            }
+            // При уходе со страницы — уничтожаем трейлер
+            if (e.type === 'destroy' || e.type === 'back') {
+                destroyTrailer();
+            }
+        });
+
+        // Ещё один хук: при смене активности
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'back') {
+                destroyTrailer();
+            }
         });
     }
 
     // ==========================================
-    //  7. Start
+    //  8. Start
     // ==========================================
     function start() {
         initListeners();
