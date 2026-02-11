@@ -2,8 +2,9 @@
 
 ## Overview
 Plugin for Lampa.mx that changes the Full Detail View (movie page) layout:
-- Poster becomes a wide backdrop image (16:9) spanning full width at the top
-- Movie info (title, ratings, buttons, description) moves below the poster
+- Wide backdrop image (original quality, up to 4K) with gradient overlay
+- Movie info (title, ratings, buttons) overlaid on the image
+- Netflix-style cinematic layout
 
 ## Files
 - `wide_covers.js` — Main plugin file (self-contained, single JS file)
@@ -14,41 +15,61 @@ Plugin for Lampa.mx that changes the Full Detail View (movie page) layout:
 
 ### Target: Full Detail View page
 Original layout: `.full-start-new__body` is flex horizontal
-- Left: `.full-start-new__left` (17em, poster 2:3)
+- Left: `.full-start-new__left` (17em, portrait poster 2:3)
 - Right: `.full-start-new__right` (title, ratings, buttons)
 
-Plugin changes layout to vertical:
-- Top: wide backdrop image (aspect ratio ~45%, covers more area)
-- Bottom: movie info
+Plugin changes to cinematic vertical layout:
+- Wide backdrop (50% aspect ratio) with gradient overlay (transparent → dark)
+- Text overlaid on poster via negative margin (-12em)
 
 ### Sections:
-1. **CSS Injection** — Overrides `.full-start-new__body` to `flex-direction: column`,
-   `.full-start-new__left` to `width: 100%`, `.full-start-new__poster` to
-   `padding-bottom: 45%` (wide landscape). Image uses `object-fit: cover`.
+1. **CSS Injection** (immediate, with !important)
+   - `.full-start-new__body` → `flex-direction: column`
+   - `.full-start-new__left` → `width: 100%`
+   - `.full-start-new__poster` → `padding-bottom: 50%` + `::after` gradient
+   - `.full-start-new__right` → `margin-top: -12em; z-index: 2`
+   - `.wide-title-row` — flex-обёртка для заголовка + кнопки Play
+   - `.wide-title-row .button--play` — белая кнопка Netflix-стиля с текстом
 
-2. **Listener Hook** — Uses `Lampa.Listener.follow('full', ...)` to intercept
-   the detail page `complite` event and swap `poster_path` → `backdrop_path`
-   (TMDB w1280 size) on the `.full--poster` img element.
+2. **Image Swap** — Takes current poster img src, modifies URL:
+   - Preserves proxy prefix (`imagetmdb.com`) and query params (`?email=...`)
+   - Replaces size (`w500` → `original`) and path (`poster_path` → `backdrop_path`)
+   - Fallback chain: `original` → `w1280`
 
-3. **DOM Observer (fallback)** — MutationObserver watches for new
-   `.full-start-new` blocks and swaps the image via `Lampa.Activity.active()`
-   movie data.
+3. **Play Button Move** — `movePlayButton()` (DOM manipulation):
+   - Finds `.button--play` in `.full-start-new__buttons`
+   - Creates `.wide-title-row` wrapper div
+   - Moves `.full-start-new__title` + `.button--play` into wrapper
+   - CSS forces `span` visible (overrides Lampa's default hide)
 
-4. **Settings** — Toggle in Settings → Interface → "Широкий постер"
+4. **Movie Data Access** — `Lampa.Activity.active().card` (primary)
+   - Activity structure: `{id, component, method, source, card, page, params, activity}`
+   - `act.card.backdrop_path` contains the TMDB backdrop file path
 
-### Key Lampa APIs used:
-- `Lampa.Listener.follow('full', ...)` — hook into detail page rendering
-- `Lampa.Activity.active()` — get current activity/movie data
-- `Lampa.Storage` / `Lampa.Params` — persistent settings
-- `Lampa.Template` / `Lampa.Lang` — templates and translations
-- `Lampa.TMDB.img()` / `Lampa.Api.img()` — TMDB image URL builder
+5. **Event Hooks** — `Lampa.Listener.follow('full', ...)` + `('activity', ...)`
+   - Also runs `trySwap()` immediately at plugin start (page may already be open)
+   - Retry: up to 30 attempts at 150ms intervals
 
-### CSS Classes:
-- `wide-covers--enabled` — body class, toggles the feature
-- `.full-start-new__*` — Lampa's Full Detail View elements being overridden
+### Lampa DOM structure (full detail view):
+```
+.full-start-new
+  .full-start-new__body
+    .full-start-new__left
+      .full-start-new__poster > img.full--poster
+    .full-start-new__right
+      .full-start-new__head
+      .wide-title-row              ← injected wrapper
+        .full-start-new__title     ← moved here
+        .button--play              ← moved here from __buttons
+      .full-start-new__tagline
+      .full-start-new__rate-line
+      .full-start-new__details
+      .full-start-new__reactions
+      .full-start-new__buttons     ← play button removed from here
+```
 
-### Data flow:
-1. App ready → inject CSS → set body class → register Listener + Observer
-2. User opens movie page → `full` event fires with `type: 'complite'`
-3. Plugin reads `movie.backdrop_path` → swaps img src to backdrop w1280
-4. CSS forces vertical layout: wide poster top, info bottom
+### Key Lampa internals:
+- Image proxy: `imagetmdb.com` (not direct `image.tmdb.org`)
+- URL format: `http://imagetmdb.com/t/p/{size}/{path}?email=...`
+- Activity API: `Lampa.Activity.active()` → `{card: {backdrop_path, poster_path, ...}}`
+- Events: `Lampa.Listener.follow('full', fn)` with `e.type === 'complite'`
