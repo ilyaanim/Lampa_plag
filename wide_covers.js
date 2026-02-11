@@ -416,6 +416,7 @@
                             poster.classList.remove('trailer-playing');
                         }
                     }
+                }
             }
         });
     }
