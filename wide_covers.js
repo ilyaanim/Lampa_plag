@@ -55,7 +55,7 @@
         '.full-start-new__right {',
         '  position: relative !important;',
         '  z-index: 2 !important;',
-        '  margin-top: -12em !important;',
+        '  margin-top: -15em !important;',
         '  padding-left: 1.5em !important;',
         '  padding-right: 1.5em !important;',
         '}',
