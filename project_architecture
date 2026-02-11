@@ -1,8 +1,9 @@
 # Project Architecture: Lampa Wide Covers Plugin
 
 ## Overview
-Plugin for Lampa.mx media center that replaces standard portrait poster covers (2:3)
-with wide landscape backdrop covers (16:9) from TMDB.
+Plugin for Lampa.mx that changes the Full Detail View (movie page) layout:
+- Poster becomes a wide backdrop image (16:9) spanning full width at the top
+- Movie info (title, ratings, buttons, description) moves below the poster
 
 ## Files
 - `wide_covers.js` — Main plugin file (self-contained, single JS file)
@@ -11,32 +12,43 @@ with wide landscape backdrop covers (16:9) from TMDB.
 
 ## Plugin Structure (wide_covers.js)
 
+### Target: Full Detail View page
+Original layout: `.full-start-new__body` is flex horizontal
+- Left: `.full-start-new__left` (17em, poster 2:3)
+- Right: `.full-start-new__right` (title, ratings, buttons)
+
+Plugin changes layout to vertical:
+- Top: wide backdrop image (aspect ratio ~45%, covers more area)
+- Bottom: movie info
+
 ### Sections:
-1. **CSS Injection** — Overrides `.card` width (12.75em → 22em) and aspect ratio
-   (150% → 56%) for all cards except `card--wide` and `card--collection`
-2. **Image Swap (MutationObserver)** — Watches for new card elements in DOM,
-   reads `card_data.backdrop_path` from card element, and swaps poster image
-   to backdrop (w780) from TMDB
-3. **Settings Integration** — Adds toggle in Settings → Interface section
-   using `Lampa.Params`, `Lampa.Template`, and `Lampa.Settings.listener`
-4. **Storage Listener** — Reacts to setting changes, toggles body class
-   `wide-covers--enabled`, and re-processes all visible cards
+1. **CSS Injection** — Overrides `.full-start-new__body` to `flex-direction: column`,
+   `.full-start-new__left` to `width: 100%`, `.full-start-new__poster` to
+   `padding-bottom: 45%` (wide landscape). Image uses `object-fit: cover`.
+
+2. **Listener Hook** — Uses `Lampa.Listener.follow('full', ...)` to intercept
+   the detail page `complite` event and swap `poster_path` → `backdrop_path`
+   (TMDB w1280 size) on the `.full--poster` img element.
+
+3. **DOM Observer (fallback)** — MutationObserver watches for new
+   `.full-start-new` blocks and swaps the image via `Lampa.Activity.active()`
+   movie data.
+
+4. **Settings** — Toggle in Settings → Interface → "Широкий постер"
 
 ### Key Lampa APIs used:
-- `Lampa.Storage` — get/set persistent settings
-- `Lampa.Params.select` — register parameter with allowed values
-- `Lampa.Template.add/get` — register and render HTML templates
-- `Lampa.Settings.listener.follow` — hook into settings UI
-- `Lampa.Lang.add` — add translations (ru, en, uk, be)
-- `Lampa.Listener.follow('app', ...)` — wait for app ready event
-- `Lampa.TMDB.img(path, size)` — construct TMDB image URL
+- `Lampa.Listener.follow('full', ...)` — hook into detail page rendering
+- `Lampa.Activity.active()` — get current activity/movie data
+- `Lampa.Storage` / `Lampa.Params` — persistent settings
+- `Lampa.Template` / `Lampa.Lang` — templates and translations
+- `Lampa.TMDB.img()` / `Lampa.Api.img()` — TMDB image URL builder
 
 ### CSS Classes:
 - `wide-covers--enabled` — body class, toggles the feature
-- `card--wide` / `card--collection` — excluded from override (native Lampa styles)
+- `.full-start-new__*` — Lampa's Full Detail View elements being overridden
 
 ### Data flow:
-1. App ready → inject CSS → set body class → start MutationObserver
-2. New `.card` appears in DOM → read `card.card_data.backdrop_path`
-3. Watch `.card__img` src attribute → when poster loads, swap to backdrop URL
-4. Settings toggle → update body class → re-scan all cards
+1. App ready → inject CSS → set body class → register Listener + Observer
+2. User opens movie page → `full` event fires with `type: 'complite'`
+3. Plugin reads `movie.backdrop_path` → swaps img src to backdrop w1280
+4. CSS forces vertical layout: wide poster top, info bottom

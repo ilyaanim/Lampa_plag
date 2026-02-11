@@ -1,45 +1,50 @@
 (function () {
     'use strict';
 
-    var PLUGIN_NAME = 'wide_covers';
     var STORAGE_KEY = 'wide_covers_enabled';
     var STYLE_ID = 'wide-covers-plugin-style';
 
     // ==========================================
-    //  CSS for wide covers
+    //  CSS: Full Detail View — wide poster layout
     // ==========================================
     var css = `
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection) {
-            width: 22em;
+        /* ===== Full Detail View: wide poster on top, text below ===== */
+
+        body.wide-covers--enabled .full-start-new__body {
+            flex-direction: column;
+            align-items: stretch;
         }
 
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection) .card__view {
-            padding-bottom: 56%;
+        body.wide-covers--enabled .full-start-new__left {
+            width: 100%;
+            max-width: 100%;
+            margin-right: 0;
+            margin-bottom: 1.5em;
         }
 
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection) .card__img {
+        body.wide-covers--enabled .full-start-new__poster {
+            padding-bottom: 45%;
+            border-radius: 1.2em;
+            overflow: hidden;
+        }
+
+        body.wide-covers--enabled .full-start-new__img {
             object-fit: cover;
+            object-position: center 20%;
+            border-radius: 1.2em;
         }
 
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection).focus .card__view::after,
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection).hover .card__view::after {
-            border-radius: 1.4em;
+        body.wide-covers--enabled .full-start-new__right {
+            margin-top: 0;
         }
 
-        body.wide-covers--enabled .items-line--type-cards {
-            min-height: 18em;
+        body.wide-covers--enabled .full-start-new__title {
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
         }
 
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection) .card__vote {
-            font-size: 1.1em;
-        }
-
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection) .card__type {
-            font-size: 0.7em;
-        }
-
-        body.wide-covers--enabled .card:not(.card--wide):not(.card--collection) .card__quality {
-            font-size: 0.7em;
+        body.wide-covers--enabled .full-start-new__description {
+            width: 100%;
         }
     `;
 
@@ -49,9 +54,11 @@
     function tmdbImg(path, size) {
         if (!path) return '';
         size = size || 'w780';
-        // Use Lampa.TMDB.img if available, otherwise construct manually
         if (window.Lampa && Lampa.TMDB && typeof Lampa.TMDB.img === 'function') {
             return Lampa.TMDB.img(path, size);
+        }
+        if (window.Lampa && Lampa.Api && typeof Lampa.Api.img === 'function') {
+            return Lampa.Api.img(path, size);
         }
         return 'https://image.tmdb.org/t/p/' + size + path;
     }
@@ -64,14 +71,14 @@
     }
 
     // ==========================================
-    //  Update body class based on setting
+    //  Update body class
     // ==========================================
     function updateBodyClass() {
         document.body.classList.toggle('wide-covers--enabled', isEnabled());
     }
 
     // ==========================================
-    //  Inject CSS into <head>
+    //  Inject CSS
     // ==========================================
     function injectCSS() {
         if (document.getElementById(STYLE_ID)) return;
@@ -83,83 +90,65 @@
     }
 
     // ==========================================
-    //  Process a single card element:
-    //  swap poster image -> backdrop image
+    //  Swap poster to backdrop on Full Detail page
     // ==========================================
-    function processCard(card) {
-        // Skip cards that already have wide/collection style
-        if (card.classList.contains('card--wide') || card.classList.contains('card--collection')) return;
+    function hookFullDetail() {
+        Lampa.Listener.follow('full', function (e) {
+            if (e.type === 'complite') {
+                if (!isEnabled()) return;
 
-        // Skip if already processed
-        if (card.dataset.wideCoverProcessed) return;
-        card.dataset.wideCoverProcessed = '1';
+                var movie = e.data && e.data.movie;
+                if (!movie || !movie.backdrop_path) return;
 
-        if (!isEnabled()) return;
+                var backdropUrl = tmdbImg(movie.backdrop_path, 'w1280');
 
-        var data = card.card_data;
-        if (!data || !data.backdrop_path) return;
+                // Find the poster image in the full detail page
+                try {
+                    var render = e.object.activity.render();
+                    var img = render.find('.full--poster');
 
-        var img = card.querySelector('.card__img');
-        if (!img) return;
+                    if (img.length && img[0]) {
+                        var posterEl = render.find('.full-start-new__poster');
 
-        var backdropUrl = tmdbImg(data.backdrop_path, 'w780');
+                        // Set backdrop image
+                        img[0].onload = function () {
+                            posterEl.addClass('loaded');
+                        };
 
-        // Function to swap image to backdrop
-        function swapToBackdrop() {
-            if (!isEnabled()) return;
-            if (!img.src) return;
-
-            // Only swap if it's a TMDB poster image or loading placeholder
-            var src = img.src;
-            var isTmdb = src.indexOf('image.tmdb.org') !== -1;
-            var isLoading = src.indexOf('img_load') !== -1;
-
-            if (isTmdb || isLoading) {
-                // Don't swap if already backdrop
-                if (src === backdropUrl) return;
-
-                img.src = backdropUrl;
-            }
-        }
-
-        // Watch for src changes (lazy loading sets src on visible)
-        var observer = new MutationObserver(function (mutations) {
-            for (var i = 0; i < mutations.length; i++) {
-                if (mutations[i].attributeName === 'src') {
-                    swapToBackdrop();
-                    break;
+                        img[0].src = backdropUrl;
+                    }
+                } catch (ex) {
+                    console.warn('[Wide Covers] Error swapping poster:', ex);
                 }
             }
         });
-
-        observer.observe(img, { attributes: true, attributeFilter: ['src'] });
-
-        // Try to swap immediately if image already has src
-        swapToBackdrop();
     }
 
     // ==========================================
-    //  Observe DOM for new cards
+    //  Also observe DOM for poster images
+    //  (fallback in case Listener doesn't catch it)
     // ==========================================
-    function observeCards() {
-        function scanNode(node) {
-            if (node.nodeType !== 1) return;
-
-            if (node.classList && node.classList.contains('card')) {
-                processCard(node);
-            }
-
-            var cards = node.querySelectorAll ? node.querySelectorAll('.card') : [];
-            for (var i = 0; i < cards.length; i++) {
-                processCard(cards[i]);
-            }
-        }
-
+    function observeFullPage() {
         var observer = new MutationObserver(function (mutations) {
+            if (!isEnabled()) return;
+
             for (var i = 0; i < mutations.length; i++) {
                 var added = mutations[i].addedNodes;
                 for (var j = 0; j < added.length; j++) {
-                    scanNode(added[j]);
+                    var node = added[j];
+                    if (node.nodeType !== 1) continue;
+
+                    // Check if a full-start-new block appeared
+                    var fullBlock = null;
+                    if (node.classList && node.classList.contains('full-start-new')) {
+                        fullBlock = node;
+                    } else if (node.querySelector) {
+                        fullBlock = node.querySelector('.full-start-new');
+                    }
+
+                    if (fullBlock) {
+                        processFullBlock(fullBlock);
+                    }
                 }
             }
         });
@@ -168,73 +157,85 @@
             childList: true,
             subtree: true
         });
-
-        // Process existing cards
-        var existingCards = document.querySelectorAll('.card');
-        for (var i = 0; i < existingCards.length; i++) {
-            processCard(existingCards[i]);
-        }
     }
 
-    // ==========================================
-    //  Re-process all cards (e.g. on toggle)
-    // ==========================================
-    function reprocessAllCards() {
-        var cards = document.querySelectorAll('.card');
-        for (var i = 0; i < cards.length; i++) {
-            var card = cards[i];
-            if (card.classList.contains('card--wide') || card.classList.contains('card--collection')) continue;
+    function processFullBlock(block) {
+        if (!isEnabled()) return;
+        if (block.dataset.wideCoverDone) return;
+        block.dataset.wideCoverDone = '1';
 
-            var data = card.card_data;
-            if (!data) continue;
+        var img = block.querySelector('.full--poster');
+        if (!img) return;
 
-            var img = card.querySelector('.card__img');
-            if (!img) continue;
+        // Try to get movie data from the activity
+        // The img src might already be set to poster — we need backdrop_path
+        // We'll watch for the src to be set and then swap it
+        var swapped = false;
 
-            if (isEnabled() && data.backdrop_path) {
-                img.src = tmdbImg(data.backdrop_path, 'w780');
-            } else if (data.poster_path) {
-                img.src = tmdbImg(data.poster_path);
+        function trySwap() {
+            if (swapped) return;
+
+            // Get the current activity's movie data
+            try {
+                var activity = Lampa.Activity.active();
+                var movie = activity && activity.params && activity.params.movie;
+                if (movie && movie.backdrop_path) {
+                    swapped = true;
+                    var backdropUrl = tmdbImg(movie.backdrop_path, 'w1280');
+                    var posterEl = block.querySelector('.full-start-new__poster');
+
+                    img.onload = function () {
+                        if (posterEl) posterEl.classList.add('loaded');
+                    };
+
+                    img.src = backdropUrl;
+                }
+            } catch (ex) {
+                // ignore
             }
-
-            // Reset processed flag so new cards get watched again
-            delete card.dataset.wideCoverProcessed;
         }
+
+        // Watch for img src changes
+        var imgObserver = new MutationObserver(function () {
+            trySwap();
+        });
+        imgObserver.observe(img, { attributes: true, attributeFilter: ['src'] });
+
+        // Also try immediately
+        setTimeout(trySwap, 100);
+        setTimeout(trySwap, 500);
     }
 
     // ==========================================
-    //  Add settings section
+    //  Settings
     // ==========================================
     function addSettings() {
-        // Add translation strings
         Lampa.Lang.add({
             wide_covers_title: {
-                ru: 'Широкие обложки',
-                en: 'Wide Covers',
-                uk: 'Широкі обкладинки',
-                be: 'Шырокія вокладкі'
+                ru: 'Широкий постер',
+                en: 'Wide Poster',
+                uk: 'Широкий постер',
+                be: 'Шырокі пастэр'
             },
             wide_covers_description: {
-                ru: 'Заменяет стандартные постеры на широкие обложки (backdrop)',
-                en: 'Replaces standard posters with wide covers (backdrop)',
-                uk: 'Замінює стандартні постери на широкі обкладинки (backdrop)',
-                be: 'Замяняе стандартныя пастэры на шырокія вокладкі (backdrop)'
+                ru: 'На странице фильма: широкий backdrop сверху, информация снизу',
+                en: 'On movie page: wide backdrop on top, info below',
+                uk: 'На сторінці фільму: широкий backdrop зверху, інформація знизу',
+                be: 'На старонцы фільма: шырокі backdrop зверху, інфармацыя знізу'
             },
             wide_covers_enabled_label: {
-                ru: 'Широкие обложки',
-                en: 'Wide Covers',
-                uk: 'Широкі обкладинки',
-                be: 'Шырокія вокладкі'
+                ru: 'Широкий постер',
+                en: 'Wide Poster',
+                uk: 'Широкий постер',
+                be: 'Шырокі пастэр'
             }
         });
 
-        // Register parameter
         Lampa.Params.select(STORAGE_KEY, {
             'true': '#{settings_param_enabled}',
             'false': '#{settings_param_disabled}'
         }, 'true');
 
-        // Add settings template
         var templateHtml = '<div class="settings-param selector" data-name="' + STORAGE_KEY + '" data-type="select">' +
             '<div class="settings-param__name">#{wide_covers_enabled_label}</div>' +
             '<div class="settings-param__value"></div>' +
@@ -243,44 +244,36 @@
 
         Lampa.Template.add('settings_wide_covers', templateHtml);
 
-        // Listen for settings open and inject our settings section
         if (Lampa.Settings && Lampa.Settings.listener) {
             Lampa.Settings.listener.follow('open', function (e) {
                 if (e.name === 'interface') {
-                    e.body.find('[data-name="interface_size"]').after(Lampa.Template.get('settings_wide_covers'));
+                    e.body.find('[data-name="interface_size"]').after(
+                        Lampa.Template.get('settings_wide_covers')
+                    );
                 }
             });
         }
 
-        // Listen for storage changes to toggle feature
         Lampa.Storage.listener.follow('change', function (e) {
             if (e.name === STORAGE_KEY) {
                 updateBodyClass();
-                reprocessAllCards();
             }
         });
     }
 
     // ==========================================
-    //  Plugin initialization
+    //  Init
     // ==========================================
     function startPlugin() {
-        // Inject styles
         injectCSS();
-
-        // Set body class
         updateBodyClass();
-
-        // Start observing cards
-        observeCards();
-
-        // Add settings
+        hookFullDetail();
+        observeFullPage();
         addSettings();
 
-        console.log('[Wide Covers] Plugin loaded, version 1.0.0');
+        console.log('[Wide Covers] Plugin v2.0.0 loaded');
     }
 
-    // Wait for Lampa to be ready
     if (window.appready) {
         startPlugin();
     } else {
