@@ -1,0 +1,42 @@
+# Project Architecture: Lampa Wide Covers Plugin
+
+## Overview
+Plugin for Lampa.mx media center that replaces standard portrait poster covers (2:3)
+with wide landscape backdrop covers (16:9) from TMDB.
+
+## Files
+- `wide_covers.js` — Main plugin file (self-contained, single JS file)
+- `project_architecture` — This file, project documentation
+- `README.md` — Installation and usage instructions
+
+## Plugin Structure (wide_covers.js)
+
+### Sections:
+1. **CSS Injection** — Overrides `.card` width (12.75em → 22em) and aspect ratio
+   (150% → 56%) for all cards except `card--wide` and `card--collection`
+2. **Image Swap (MutationObserver)** — Watches for new card elements in DOM,
+   reads `card_data.backdrop_path` from card element, and swaps poster image
+   to backdrop (w780) from TMDB
+3. **Settings Integration** — Adds toggle in Settings → Interface section
+   using `Lampa.Params`, `Lampa.Template`, and `Lampa.Settings.listener`
+4. **Storage Listener** — Reacts to setting changes, toggles body class
+   `wide-covers--enabled`, and re-processes all visible cards
+
+### Key Lampa APIs used:
+- `Lampa.Storage` — get/set persistent settings
+- `Lampa.Params.select` — register parameter with allowed values
+- `Lampa.Template.add/get` — register and render HTML templates
+- `Lampa.Settings.listener.follow` — hook into settings UI
+- `Lampa.Lang.add` — add translations (ru, en, uk, be)
+- `Lampa.Listener.follow('app', ...)` — wait for app ready event
+- `Lampa.TMDB.img(path, size)` — construct TMDB image URL
+
+### CSS Classes:
+- `wide-covers--enabled` — body class, toggles the feature
+- `card--wide` / `card--collection` — excluded from override (native Lampa styles)
+
+### Data flow:
+1. App ready → inject CSS → set body class → start MutationObserver
+2. New `.card` appears in DOM → read `card.card_data.backdrop_path`
+3. Watch `.card__img` src attribute → when poster loads, swap to backdrop URL
+4. Settings toggle → update body class → re-scan all cards
