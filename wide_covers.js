@@ -293,71 +293,68 @@
         return scored.map(function (s) { return s.video; });
     }
 
-    // Piped API — получить прямую ссылку на видео
-    var PIPED_INSTANCES = [
-        'https://pipedapi.kavin.rocks',
-        'https://pipedapi.adminforge.de',
-        'https://api.piped.yt'
+    // Invidious API — получить прямую ссылку на видео
+    var INVIDIOUS_INSTANCES = [
+        'https://inv.nadeko.net',
+        'https://invidious.fdn.fr',
+        'https://invidious.nerdvpn.de',
+        'https://iv.ggtyler.dev',
+        'https://invidious.privacyredirect.com'
     ];
 
     function fetchDirectUrl(videoId, callback) {
         var tried = 0;
 
         function tryNext() {
-            if (tried >= PIPED_INSTANCES.length) {
-                console.log('[Wide Covers] all Piped instances failed');
+            if (tried >= INVIDIOUS_INSTANCES.length) {
+                console.log('[Wide Covers] all Invidious instances failed');
                 callback(null);
                 return;
             }
 
-            var apiUrl = PIPED_INSTANCES[tried] + '/streams/' + videoId;
+            var apiUrl = INVIDIOUS_INSTANCES[tried] + '/api/v1/videos/' + videoId + '?fields=formatStreams';
             tried++;
 
-            console.log('[Wide Covers] trying Piped:', apiUrl);
+            console.log('[Wide Covers] trying Invidious:', apiUrl);
             var xhr = new XMLHttpRequest();
             xhr.open('GET', apiUrl);
-            xhr.timeout = 6000;
+            xhr.timeout = 8000;
             xhr.onload = function () {
                 try {
                     var data = JSON.parse(xhr.responseText);
+                    var streams = data.formatStreams || [];
 
-                    // Ищем mp4 поток с аудио (не videoOnly)
-                    var streams = (data.videoStreams || []).filter(function (s) {
-                        return !s.videoOnly && s.mimeType && s.mimeType.indexOf('video/mp4') !== -1;
+                    // Ищем mp4 720p или ближайшее
+                    var mp4 = streams.filter(function (s) {
+                        return s.container === 'mp4' || (s.type && s.type.indexOf('video/mp4') !== -1);
                     });
 
-                    // Сортируем по качеству (720p предпочтительно)
-                    streams.sort(function (a, b) {
-                        var qa = parseInt(a.quality) || 0;
-                        var qb = parseInt(b.quality) || 0;
-                        // Предпочитаем 720p, затем ближайшее к нему
+                    if (!mp4.length) mp4 = streams; // fallback на все
+
+                    // Сортируем: 720p предпочтительно
+                    mp4.sort(function (a, b) {
+                        var qa = parseInt(a.qualityLabel || a.quality) || 0;
+                        var qb = parseInt(b.qualityLabel || b.quality) || 0;
                         var da = Math.abs(qa - 720);
                         var db = Math.abs(qb - 720);
                         return da - db;
                     });
 
-                    if (streams.length && streams[0].url) {
-                        console.log('[Wide Covers] got direct URL:', streams[0].quality, streams[0].mimeType);
-                        callback(streams[0].url);
+                    if (mp4.length && mp4[0].url) {
+                        console.log('[Wide Covers] got direct URL:', mp4[0].qualityLabel || mp4[0].quality);
+                        callback(mp4[0].url);
                         return;
                     }
 
-                    // Fallback: HLS stream
-                    if (data.hls) {
-                        console.log('[Wide Covers] got HLS URL');
-                        callback(data.hls);
-                        return;
-                    }
-
-                    console.log('[Wide Covers] no suitable stream from this instance');
+                    console.log('[Wide Covers] no streams from this instance');
                     tryNext();
                 } catch (e) {
-                    console.log('[Wide Covers] Piped parse error:', e);
+                    console.log('[Wide Covers] parse error:', e);
                     tryNext();
                 }
             };
             xhr.onerror = xhr.ontimeout = function () {
-                console.log('[Wide Covers] Piped request failed');
+                console.log('[Wide Covers] Invidious request failed');
                 tryNext();
             };
             xhr.send();
@@ -366,18 +363,22 @@
         tryNext();
     }
 
+    var trailerLoading = false;
+
     function loadTrailer() {
+        if (trailerLoading) return;
+
         var poster = document.querySelector('.full-start-new__poster');
-        console.log('[Wide Covers] loadTrailer: poster=', !!poster);
         if (!poster) return;
-        if (poster.querySelector('.wide-trailer-wrap')) { console.log('[Wide Covers] trailer wrap already exists'); return; }
+        if (poster.querySelector('.wide-trailer-wrap')) return;
 
         var movie = getMovie();
-        console.log('[Wide Covers] loadTrailer: movie=', movie ? movie.title + ' id=' + movie.id : 'null');
         if (!movie || !movie.id) return;
 
         var mediaType = getMediaType();
         trailerState.active = true;
+        trailerLoading = true;
+        console.log('[Wide Covers] loadTrailer:', movie.title, 'id=' + movie.id, 'type=' + mediaType);
 
         fetchTrailers(movie.id, mediaType, function (videos) {
             console.log('[Wide Covers] fetchTrailers result:', videos.length, 'videos');
@@ -489,6 +490,7 @@
         trailerState.active = false;
         trailerState.trailerList = [];
         trailerState.currentIndex = 0;
+        trailerLoading = false;
 
         cleanupCurrentTrailer();
 
