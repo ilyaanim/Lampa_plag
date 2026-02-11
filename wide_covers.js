@@ -70,12 +70,20 @@
     // ==========================================
     function swapPoster() {
         var img = document.querySelector('.full-start-new .full--poster');
-        if (!img) return false;
+        if (!img) {
+            console.log('[Wide Covers] No .full--poster img found');
+            return false;
+        }
         if (img.getAttribute('data-wide-done') === '1') return true;
 
         // Ждём пока Lampa загрузит постер (src будет содержать tmdb URL)
         var currentSrc = img.getAttribute('src') || img.src || '';
-        if (!currentSrc || currentSrc.indexOf('/t/p/') === -1) return false;
+        console.log('[Wide Covers] Current img src:', currentSrc);
+
+        if (!currentSrc || currentSrc.indexOf('/t/p/') === -1) {
+            console.log('[Wide Covers] Src not ready yet, waiting...');
+            return false;
+        }
 
         // Получаем данные фильма
         var movie = null;
@@ -83,10 +91,14 @@
             var act = Lampa.Activity.active();
             movie = act && act.params ? act.params.movie : null;
         } catch (e) {
+            console.log('[Wide Covers] Error getting activity:', e);
             return false;
         }
 
-        if (!movie || !movie.backdrop_path) return false;
+        if (!movie || !movie.backdrop_path) {
+            console.log('[Wide Covers] No movie or no backdrop_path:', movie ? movie.title : 'null');
+            return false;
+        }
 
         img.setAttribute('data-wide-done', '1');
 
@@ -160,18 +172,31 @@
     // ==========================================
     //  5. Start
     // ==========================================
-    if (window.appready) {
+    function start() {
+        console.log('[Wide Covers] Plugin starting...');
         initListeners();
+        // Сразу пробуем подменить (страница фильма может быть уже открыта)
+        trySwap(30);
+        console.log('[Wide Covers] Plugin ready');
+    }
+
+    if (window.appready) {
+        start();
     } else {
         Lampa.Listener.follow('app', function (e) {
             if (e.type === 'ready') {
-                initListeners();
+                start();
             }
         });
     }
 
-    if (window.Lampa && Lampa.Listener) {
-        try { initListeners(); } catch (e) {}
+    // Fallback: если 'ready' уже прошёл
+    try {
+        if (window.Lampa && Lampa.Listener) {
+            start();
+        }
+    } catch (e) {
+        console.log('[Wide Covers] Fallback error:', e);
     }
 
 })();
