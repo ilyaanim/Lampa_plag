@@ -20,7 +20,7 @@
         '  margin-bottom: 0 !important;',
         '}',
 
-        // --- Poster: широкий с градиентом ---
+        // --- Poster: широкий с fade ---
         '.full-start-new__poster {',
         '  padding-bottom: 50% !important;',
         '  border-top-left-radius: 2em !important;',
@@ -93,7 +93,7 @@
         '  display: none !important;',
         '}',
 
-        // --- Trailer iframe поверх постера ---
+        // --- Trailer: контейнер поверх постера ---
         '.wide-trailer-wrap {',
         '  position: absolute !important;',
         '  top: 0 !important;',
@@ -110,16 +110,14 @@
         '.wide-trailer-wrap.visible {',
         '  opacity: 1 !important;',
         '}',
-        '.wide-trailer-wrap iframe {',
+        '#wide-trailer-player {',
         '  position: absolute !important;',
         '  top: -60px !important;',
         '  left: 0 !important;',
         '  width: 100% !important;',
         '  height: calc(100% + 120px) !important;',
-        '  border: none !important;',
         '  pointer-events: none !important;',
         '}',
-        // Постер fade out когда трейлер играет
         '.full-start-new__poster.trailer-playing .full-start-new__img {',
         '  opacity: 0 !important;',
         '  transition: opacity 1s ease !important;',
@@ -216,12 +214,15 @@
     }
 
     // ==========================================
-    //  5. Трейлер: загрузка и воспроизведение
+    //  5. Трейлер через YT.Player (Lampa API)
     // ==========================================
     var trailerState = {
+        player: null,
         wrap: null,
         timer: null,
-        active: false
+        active: false,
+        trailerList: [],
+        currentIndex: 0
     };
 
     function fetchTrailers(movieId, mediaType, callback) {
@@ -269,11 +270,9 @@
     }
 
     function sortTrailers(videos) {
-        // Сортируем YouTube видео по приоритету
         var yt = videos.filter(function (v) { return v.site === 'YouTube'; });
         if (!yt.length) return [];
 
-        // Категории: официальный трейлер → трейлер → тизер → остальное
         var scored = yt.map(function (v) {
             var s = 0;
             if (v.type === 'Trailer') s += 10;
@@ -284,6 +283,37 @@
 
         scored.sort(function (a, b) { return b.score - a.score; });
         return scored.map(function (s) { return s.video; });
+    }
+
+    // Загрузить YouTube IFrame API если ещё не загружен
+    function ensureYTAPI(callback) {
+        if (window.YT && window.YT.Player) {
+            callback();
+            return;
+        }
+
+        // Может уже загружается
+        if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+            var checkInterval = setInterval(function () {
+                if (window.YT && window.YT.Player) {
+                    clearInterval(checkInterval);
+                    callback();
+                }
+            }, 200);
+            setTimeout(function () { clearInterval(checkInterval); }, 10000);
+            return;
+        }
+
+        // Загружаем
+        var oldCallback = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = function () {
+            if (oldCallback) oldCallback();
+            callback();
+        };
+
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
     }
 
     function loadTrailer() {
@@ -304,87 +334,105 @@
             var sorted = sortTrailers(videos);
             if (!sorted.length) return;
 
-            tryEmbedTrailer(poster, sorted, 0);
+            trailerState.trailerList = sorted;
+            trailerState.currentIndex = 0;
+
+            ensureYTAPI(function () {
+                if (!trailerState.active) return;
+                tryPlayTrailer(poster);
+            });
         });
     }
 
-    function tryEmbedTrailer(poster, trailerList, index) {
-        if (index >= trailerList.length || index >= 3) return; // макс 3 попытки
+    function tryPlayTrailer(poster) {
+        if (trailerState.currentIndex >= trailerState.trailerList.length) return;
+        if (trailerState.currentIndex >= 3) return; // макс 3 попытки
         if (!trailerState.active) return;
 
-        var videoId = trailerList[index].key;
-        var origin = window.location.origin || window.location.protocol + '//' + window.location.host;
+        var videoId = trailerState.trailerList[trailerState.currentIndex].key;
 
+        // Создаём контейнер
         var wrap = document.createElement('div');
         wrap.className = 'wide-trailer-wrap';
 
-        var iframe = document.createElement('iframe');
-        iframe.setAttribute('src',
-            'https://www.youtube-nocookie.com/embed/' + videoId +
-            '?autoplay=1&mute=1&controls=0&showinfo=0&rel=0' +
-            '&modestbranding=1&playsinline=1' +
-            '&iv_load_policy=3&disablekb=1' +
-            '&origin=' + encodeURIComponent(origin) +
-            '&enablejsapi=1'
-        );
-        iframe.setAttribute('allow', 'autoplay; encrypted-media');
-        iframe.setAttribute('allowfullscreen', '');
+        var playerDiv = document.createElement('div');
+        playerDiv.id = 'wide-trailer-player';
+        wrap.appendChild(playerDiv);
 
-        wrap.appendChild(iframe);
         poster.appendChild(wrap);
         trailerState.wrap = wrap;
 
-        // Слушаем сообщения от YouTube IFrame API об ошибках
-        var errorHandler = function (event) {
-            try {
-                var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-                if (data && data.event === 'onError') {
-                    // Ошибка — убираем и пробуем следующий трейлер
-                    window.removeEventListener('message', errorHandler);
-                    if (trailerState.wrap === wrap) {
-                        wrap.remove();
-                        trailerState.wrap = null;
-                        if (trailerState.timer) {
-                            clearTimeout(trailerState.timer);
-                            trailerState.timer = null;
+        // Создаём YT.Player
+        trailerState.player = new YT.Player('wide-trailer-player', {
+            videoId: videoId,
+            playerVars: {
+                autoplay: 1,
+                mute: 1,
+                controls: 0,
+                showinfo: 0,
+                rel: 0,
+                modestbranding: 1,
+                playsinline: 1,
+                iv_load_policy: 3,
+                disablekb: 1,
+                fs: 0
+            },
+            events: {
+                onReady: function (event) {
+                    event.target.mute();
+                    event.target.playVideo();
+
+                    // Буфер 5 секунд, затем показываем
+                    trailerState.timer = setTimeout(function () {
+                        if (!trailerState.active) return;
+                        if (trailerState.wrap !== wrap) return;
+                        wrap.classList.add('visible');
+                        poster.classList.add('trailer-playing');
+                    }, 5000);
+                },
+                onError: function () {
+                    // Ошибка — пробуем следующий трейлер
+                    cleanupCurrentTrailer();
+                    trailerState.currentIndex++;
+                    tryPlayTrailer(poster);
+                },
+                onStateChange: function (event) {
+                    // Если видео закончилось — скрываем
+                    if (event.data === YT.PlayerState.ENDED) {
+                        if (wrap.classList.contains('visible')) {
+                            wrap.classList.remove('visible');
+                            poster.classList.remove('trailer-playing');
                         }
-                        tryEmbedTrailer(poster, trailerList, index + 1);
                     }
                 }
-            } catch (e) {}
-        };
-        window.addEventListener('message', errorHandler);
-
-        // Буфер 5 секунд, затем показываем
-        trailerState.timer = setTimeout(function () {
-            if (!trailerState.active) return;
-            if (trailerState.wrap !== wrap) return;
-            wrap.classList.add('visible');
-            poster.classList.add('trailer-playing');
-            // Убираем error listener после успешного показа
-            setTimeout(function () {
-                window.removeEventListener('message', errorHandler);
-            }, 3000);
-        }, 5000);
+            }
+        });
     }
 
-    function destroyTrailer() {
-        trailerState.active = false;
-
+    function cleanupCurrentTrailer() {
         if (trailerState.timer) {
             clearTimeout(trailerState.timer);
             trailerState.timer = null;
         }
 
+        if (trailerState.player) {
+            try { trailerState.player.destroy(); } catch (e) {}
+            trailerState.player = null;
+        }
+
         if (trailerState.wrap) {
-            // Удаляем iframe — останавливает загрузку и освобождает память
-            var iframe = trailerState.wrap.querySelector('iframe');
-            if (iframe) iframe.setAttribute('src', '');
             trailerState.wrap.remove();
             trailerState.wrap = null;
         }
+    }
 
-        // Убираем класс с постера
+    function destroyTrailer() {
+        trailerState.active = false;
+        trailerState.trailerList = [];
+        trailerState.currentIndex = 0;
+
+        cleanupCurrentTrailer();
+
         var poster = document.querySelector('.full-start-new__poster');
         if (poster) poster.classList.remove('trailer-playing');
     }
@@ -397,7 +445,6 @@
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) {
-            // Постер готов — запускаем трейлер
             loadTrailer();
             return;
         }
@@ -420,13 +467,11 @@
                 destroyTrailer();
                 trySwap(20);
             }
-            // При уходе со страницы — уничтожаем трейлер
             if (e.type === 'destroy' || e.type === 'back') {
                 destroyTrailer();
             }
         });
 
-        // Ещё один хук: при смене активности
         Lampa.Listener.follow('app', function (e) {
             if (e.type === 'back') {
                 destroyTrailer();
