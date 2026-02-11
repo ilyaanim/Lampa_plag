@@ -24,7 +24,10 @@
         // --- Poster: широкий с градиентом ---
         '.full-start-new__poster {',
         '  padding-bottom: 50% !important;',
-        '  border-radius: 0 !important;',
+        '  border-top-left-radius: 2em !important;',
+        '  border-top-right-radius: 2em !important;',
+        '  border-bottom-left-radius: 0 !important;',
+        '  border-bottom-right-radius: 0 !important;',
         '  overflow: hidden !important;',
         '  position: relative !important;',
         '}',
@@ -42,7 +45,10 @@
         '.full-start-new__poster .full-start-new__img {',
         '  object-fit: cover !important;',
         '  object-position: center 20% !important;',
-        '  border-radius: 0 !important;',
+        '  border-top-left-radius: 2em !important;',
+        '  border-top-right-radius: 2em !important;',
+        '  border-bottom-left-radius: 0 !important;',
+        '  border-bottom-right-radius: 0 !important;',
         '}',
 
         // --- Правая часть: поверх постера ---
@@ -74,7 +80,7 @@
         // --- Title row: заголовок + кнопка ---
         '.wide-title-row {',
         '  display: flex !important;',
-        '  align-items: center !important;',
+        '  align-items: flex-end !important;',
         '  justify-content: space-between !important;',
         '  gap: 1em !important;',
         '  margin-bottom: 0.3em !important;',
@@ -96,6 +102,8 @@
         '  transition: background 0.2s !important;',
         '  white-space: nowrap !important;',
         '  margin-left: auto !important;',
+        '  margin-right: 3em !important;',
+        '  margin-bottom: 0.2em !important;',
         '}',
         '.wide-title-row .button--play:hover,',
         '.wide-title-row .button--play.focus {',
