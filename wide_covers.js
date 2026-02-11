@@ -110,13 +110,15 @@
         '.wide-trailer-wrap.visible {',
         '  opacity: 1 !important;',
         '}',
-        '#wide-trailer-player {',
+        '.wide-trailer-wrap iframe,',
+        '.wide-trailer-wrap > div {',
         '  position: absolute !important;',
         '  top: -60px !important;',
         '  left: 0 !important;',
         '  width: 100% !important;',
         '  height: calc(100% + 120px) !important;',
         '  pointer-events: none !important;',
+        '  border: none !important;',
         '}',
         '.full-start-new__poster.trailer-playing .full-start-new__img {',
         '  opacity: 0 !important;',
@@ -318,26 +320,33 @@
 
     function loadTrailer() {
         var poster = document.querySelector('.full-start-new__poster');
+        console.log('[Wide Covers] loadTrailer: poster=', !!poster);
         if (!poster) return;
-        if (poster.querySelector('.wide-trailer-wrap')) return;
+        if (poster.querySelector('.wide-trailer-wrap')) { console.log('[Wide Covers] trailer wrap already exists'); return; }
 
         var movie = getMovie();
+        console.log('[Wide Covers] loadTrailer: movie=', movie ? movie.title + ' id=' + movie.id : 'null');
         if (!movie || !movie.id) return;
 
         var mediaType = getMediaType();
+        console.log('[Wide Covers] loadTrailer: mediaType=', mediaType);
 
         trailerState.active = true;
 
         fetchTrailers(movie.id, mediaType, function (videos) {
-            if (!trailerState.active) return;
+            console.log('[Wide Covers] fetchTrailers result:', videos.length, 'videos');
+            if (!trailerState.active) { console.log('[Wide Covers] not active anymore'); return; }
 
             var sorted = sortTrailers(videos);
+            console.log('[Wide Covers] sorted trailers:', sorted.length, sorted.length ? sorted[0].key : 'none');
             if (!sorted.length) return;
 
             trailerState.trailerList = sorted;
             trailerState.currentIndex = 0;
 
+            console.log('[Wide Covers] loading YT API...');
             ensureYTAPI(function () {
+                console.log('[Wide Covers] YT API ready, active=', trailerState.active);
                 if (!trailerState.active) return;
                 tryPlayTrailer(poster);
             });
@@ -345,25 +354,27 @@
     }
 
     function tryPlayTrailer(poster) {
-        if (trailerState.currentIndex >= trailerState.trailerList.length) return;
-        if (trailerState.currentIndex >= 3) return; // макс 3 попытки
+        if (trailerState.currentIndex >= trailerState.trailerList.length) { console.log('[Wide Covers] no more trailers'); return; }
+        if (trailerState.currentIndex >= 3) { console.log('[Wide Covers] max attempts reached'); return; }
         if (!trailerState.active) return;
 
         var videoId = trailerState.trailerList[trailerState.currentIndex].key;
+        console.log('[Wide Covers] tryPlayTrailer #' + trailerState.currentIndex + ': ' + videoId);
 
         // Создаём контейнер
         var wrap = document.createElement('div');
         wrap.className = 'wide-trailer-wrap';
 
         var playerDiv = document.createElement('div');
-        playerDiv.id = 'wide-trailer-player';
+        playerDiv.id = 'wide-trailer-player-' + Date.now();
         wrap.appendChild(playerDiv);
 
         poster.appendChild(wrap);
         trailerState.wrap = wrap;
 
         // Создаём YT.Player
-        trailerState.player = new YT.Player('wide-trailer-player', {
+        console.log('[Wide Covers] creating YT.Player for div #' + playerDiv.id);
+        trailerState.player = new YT.Player(playerDiv.id, {
             videoId: videoId,
             playerVars: {
                 autoplay: 1,
@@ -379,32 +390,32 @@
             },
             events: {
                 onReady: function (event) {
+                    console.log('[Wide Covers] YT onReady');
                     event.target.mute();
                     event.target.playVideo();
 
-                    // Буфер 5 секунд, затем показываем
                     trailerState.timer = setTimeout(function () {
                         if (!trailerState.active) return;
                         if (trailerState.wrap !== wrap) return;
+                        console.log('[Wide Covers] showing trailer');
                         wrap.classList.add('visible');
                         poster.classList.add('trailer-playing');
                     }, 5000);
                 },
-                onError: function () {
-                    // Ошибка — пробуем следующий трейлер
+                onError: function (event) {
+                    console.log('[Wide Covers] YT onError:', event.data);
                     cleanupCurrentTrailer();
                     trailerState.currentIndex++;
                     tryPlayTrailer(poster);
                 },
                 onStateChange: function (event) {
-                    // Если видео закончилось — скрываем
+                    console.log('[Wide Covers] YT state:', event.data);
                     if (event.data === YT.PlayerState.ENDED) {
                         if (wrap.classList.contains('visible')) {
                             wrap.classList.remove('visible');
                             poster.classList.remove('trailer-playing');
                         }
                     }
-                }
             }
         });
     }
