@@ -85,20 +85,54 @@
             return false;
         }
 
-        // Получаем данные фильма
+        // Получаем данные фильма — пробуем несколько способов
         var movie = null;
         try {
             var act = Lampa.Activity.active();
-            movie = act && act.params ? act.params.movie : null;
+            console.log('[Wide Covers] Activity:', act ? Object.keys(act).join(',') : 'null');
+
+            if (act) {
+                // Способ 1: act.params.movie
+                if (act.params && act.params.movie) movie = act.params.movie;
+                // Способ 2: act.movie
+                else if (act.movie) movie = act.movie;
+                // Способ 3: act.card
+                else if (act.card) movie = act.card;
+                // Способ 4: act.params.card
+                else if (act.params && act.params.card) movie = act.params.card;
+                // Способ 5: act.data
+                else if (act.data && act.data.movie) movie = act.data.movie;
+
+                if (!movie) console.log('[Wide Covers] params keys:', act.params ? Object.keys(act.params).join(',') : 'no params');
+            }
         } catch (e) {
             console.log('[Wide Covers] Error getting activity:', e);
             return false;
         }
 
+        // Способ 6: найти backdrop_path из URL страницы + TMDB fetch
+        // Способ 7: если есть data-атрибуты на элементе
+        if (!movie) {
+            try {
+                var allActs = Lampa.Activity.all ? Lampa.Activity.all() : null;
+                if (allActs && allActs.length) {
+                    for (var a = allActs.length - 1; a >= 0; a--) {
+                        var ac = allActs[a];
+                        if (ac && ac.params && ac.params.movie) { movie = ac.params.movie; break; }
+                        if (ac && ac.movie) { movie = ac.movie; break; }
+                        if (ac && ac.card) { movie = ac.card; break; }
+                    }
+                    console.log('[Wide Covers] Found via Activity.all():', movie ? movie.title : 'still null');
+                }
+            } catch (e2) {}
+        }
+
         if (!movie || !movie.backdrop_path) {
-            console.log('[Wide Covers] No movie or no backdrop_path:', movie ? movie.title : 'null');
+            console.log('[Wide Covers] No movie or no backdrop_path:', movie ? (movie.title + ' keys:' + Object.keys(movie).join(',')) : 'null');
             return false;
         }
+
+        console.log('[Wide Covers] Movie found:', movie.title, 'backdrop:', movie.backdrop_path);
 
         img.setAttribute('data-wide-done', '1');
 
