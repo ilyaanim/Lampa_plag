@@ -81,9 +81,12 @@
         '  -webkit-filter: blur(20px) brightness(0.4) !important;',
         '}',
 
-        // --- Кнопки: текст всегда видим ---
+        // --- Кнопки: текст видим только у Play ---
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
+        '}',
+        '.full-start-new__buttons .full-start__button:not(.button--play) span {',
+        '  display: none !important;',
         '}',
 
         // --- Скрыть реакции ---
