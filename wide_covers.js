@@ -346,7 +346,10 @@
             if (!trailerState.active) { console.log('[Wide Covers] not active anymore'); return; }
 
             var sorted = sortTrailers(videos);
-            console.log('[Wide Covers] sorted trailers:', sorted.length, sorted.length ? sorted[0].key : 'none');
+            console.log('[Wide Covers] ALL trailers:');
+            sorted.forEach(function (v, i) {
+                console.log('[Wide Covers]  #' + i + ': ' + v.type + ' | ' + v.name + ' | ' + (v.published_at || 'no date') + ' | key=' + v.key + ' | official=' + v.official);
+            });
             if (!sorted.length) return;
 
             trailerState.trailerList = sorted;
