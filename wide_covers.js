@@ -50,6 +50,15 @@
         '  position: relative !important;',
         '  z-index: 2 !important;',
         '  margin-top: -30em !important;',
+        '  padding-left: 1.5em !important;',
+        '  padding-right: 1.5em !important;',
+        '}',
+
+        // --- Выровнять секции ниже постера по тому же отступу ---
+        '.full-start-new ~ div,',
+        '.full-start-new ~ section {',
+        '  padding-left: 1.5em !important;',
+        '  padding-right: 1.5em !important;',
         '}',
         '.full-start-new__title {',
         '  -webkit-line-clamp: 2 !important;',
