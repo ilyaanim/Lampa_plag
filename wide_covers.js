@@ -2,7 +2,7 @@
     'use strict';
 
     // ==========================================
-    //  1. CSS: backdrop с градиентом, текст поверх
+    //  1. CSS
     // ==========================================
     var style = document.createElement('style');
     style.id = 'wide-covers-plugin-style';
@@ -65,29 +65,19 @@
     document.head.appendChild(style);
 
     // ==========================================
-    //  2. Построить URL через Lampa API (с прокси)
-    // ==========================================
-    function buildImgUrl(path, size) {
-        if (!path) return '';
-        size = size || 'original';
-        try {
-            // Lampa.Api.img() — правильный способ, учитывает прокси
-            return Lampa.Api.img(path, size);
-        } catch (e) {}
-        try {
-            return Lampa.TMDB.image('t/p/' + size + path);
-        } catch (e) {}
-        return 'https://image.tmdb.org/t/p/' + size + path;
-    }
-
-    // ==========================================
-    //  3. Подмена постера на backdrop
+    //  2. Подмена: берём текущий src постера,
+    //     меняем размер на original и путь на backdrop
     // ==========================================
     function swapPoster() {
         var img = document.querySelector('.full-start-new .full--poster');
         if (!img) return false;
         if (img.getAttribute('data-wide-done') === '1') return true;
 
+        // Ждём пока Lampa загрузит постер (src будет содержать tmdb URL)
+        var currentSrc = img.getAttribute('src') || img.src || '';
+        if (!currentSrc || currentSrc.indexOf('/t/p/') === -1) return false;
+
+        // Получаем данные фильма
         var movie = null;
         try {
             var act = Lampa.Activity.active();
@@ -100,56 +90,75 @@
 
         img.setAttribute('data-wide-done', '1');
 
-        // original → w1280 fallback
-        var urlOriginal = buildImgUrl(movie.backdrop_path, 'original');
-        var urlFallback = buildImgUrl(movie.backdrop_path, 'w1280');
+        // Берём текущий URL (с прокси или без) и модифицируем:
+        // 1. Заменяем размер на original
+        // 2. Заменяем путь файла на backdrop_path
+        var newSrc = currentSrc.replace(/\/t\/p\/[^\/]+\//, '/t/p/original/');
+        // Заменяем имя файла (последнюю часть пути после /t/p/size/)
+        var tmdbPathIndex = newSrc.indexOf('/t/p/');
+        if (tmdbPathIndex !== -1) {
+            var prefix = newSrc.substring(0, tmdbPathIndex) + '/t/p/original';
+            newSrc = prefix + movie.backdrop_path;
+        }
+
+        var fallbackSrc = currentSrc.replace(/\/t\/p\/[^\/]+\//, '/t/p/w1280/');
+        var fIndex = fallbackSrc.indexOf('/t/p/');
+        if (fIndex !== -1) {
+            var fPrefix = fallbackSrc.substring(0, fIndex) + '/t/p/w1280';
+            fallbackSrc = fPrefix + movie.backdrop_path;
+        }
+
+        console.log('[Wide Covers] Swapping poster:', currentSrc, '->', newSrc);
 
         img.onload = function () {
             var p = this.closest('.full-start-new__poster');
             if (p) p.classList.add('loaded');
+            console.log('[Wide Covers] Backdrop loaded OK');
         };
 
         img.onerror = function () {
-            this.onerror = function () {};
-            this.src = urlFallback;
+            console.log('[Wide Covers] Original failed, trying w1280:', fallbackSrc);
+            this.onerror = function () {
+                console.log('[Wide Covers] w1280 also failed');
+            };
+            this.src = fallbackSrc;
         };
 
-        img.src = urlOriginal;
-
+        img.src = newSrc;
         return true;
     }
 
     // ==========================================
-    //  4. Агрессивный retry пока не сработает
+    //  3. Retry: пробуем пока не получится
     // ==========================================
-    function trySwapWithRetry(attempts, delay) {
-        if (attempts <= 0) return;
+    function trySwap(attemptsLeft) {
+        if (attemptsLeft <= 0) return;
         if (swapPoster()) return;
 
         setTimeout(function () {
-            trySwapWithRetry(attempts - 1, delay);
-        }, delay);
+            trySwap(attemptsLeft - 1);
+        }, 150);
     }
 
     // ==========================================
-    //  5. Listeners
+    //  4. Listeners
     // ==========================================
     function initListeners() {
         Lampa.Listener.follow('full', function (e) {
             if (e.type === 'complite') {
-                trySwapWithRetry(10, 100);
+                trySwap(20);
             }
         });
 
         Lampa.Listener.follow('activity', function (e) {
             if (e.type === 'start') {
-                trySwapWithRetry(10, 150);
+                trySwap(20);
             }
         });
     }
 
     // ==========================================
-    //  6. Start
+    //  5. Start
     // ==========================================
     if (window.appready) {
         initListeners();
