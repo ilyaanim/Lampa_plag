@@ -63,9 +63,6 @@
         '  -webkit-line-clamp: 2 !important;',
         '  line-clamp: 2 !important;',
         '  text-shadow: 0 0.1em 0.4em rgba(0,0,0,0.7) !important;',
-        '  margin-bottom: 0 !important;',
-        '  flex-shrink: 1 !important;',
-        '  min-width: 0 !important;',
         '}',
         '.full-start-new__description {',
         '  width: 100% !important;',
@@ -83,47 +80,9 @@
         '  -webkit-filter: blur(20px) !important;',
         '}',
 
-        // --- Title row: заголовок + кнопка ---
-        '.wide-title-row {',
-        '  display: flex !important;',
-        '  align-items: flex-end !important;',
-        '  justify-content: space-between !important;',
-        '  gap: 1em !important;',
-        '  margin-bottom: 0.3em !important;',
-        '}',
-
-        // --- Кнопка воспроизведения (Netflix-style) ---
-        '.wide-title-row .button--play {',
-        '  flex-shrink: 0 !important;',
-        '  display: flex !important;',
-        '  align-items: center !important;',
-        '  gap: 0.4em !important;',
-        '  background: rgba(255,255,255,1) !important;',
-        '  color: #000 !important;',
-        '  border-radius: 2em !important;',
-        '  padding: 0.5em 1.5em 0.5em 1.1em !important;',
-        '  font-size: 1.3em !important;',
-        '  font-weight: 600 !important;',
-        '  cursor: pointer !important;',
-        '  transition: background 0.2s !important;',
-        '  white-space: nowrap !important;',
-        '  margin-left: auto !important;',
-        '  margin-right: 3em !important;',
-        '  margin-bottom: 0.2em !important;',
-        '}',
-        '.wide-title-row .button--play:hover,',
-        '.wide-title-row .button--play.focus {',
-        '  background: rgba(255,255,255,0.75) !important;',
-        '}',
-        '.wide-title-row .button--play span {',
+        // --- Кнопки: текст всегда видим ---
+        '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
-        '  color: #000 !important;',
-        '  font-weight: 600 !important;',
-        '}',
-        '.wide-title-row .button--play svg {',
-        '  width: 1.1em !important;',
-        '  height: 1.1em !important;',
-        '  fill: #000 !important;',
         '}'
     ].join('\n');
     document.head.appendChild(style);
@@ -185,29 +144,22 @@
     }
 
     // ==========================================
-    //  4. Переместить кнопку Play к заголовку
+    //  4. Переместить блок кнопок выше реакций
     // ==========================================
-    function movePlayButton() {
+    function moveButtonsBlock() {
         var fullNew = document.querySelector('.full-start-new');
         if (!fullNew) return false;
 
-        // Уже перемещена?
-        if (fullNew.querySelector('.wide-title-row')) return true;
+        var buttons = fullNew.querySelector('.full-start-new__buttons');
+        var reactions = fullNew.querySelector('.full-start-new__reactions');
+        if (!buttons || !reactions) return false;
 
-        var title = fullNew.querySelector('.full-start-new__title');
-        var playBtn = fullNew.querySelector('.button--play');
-        if (!title || !playBtn) return false;
+        // Уже перемещён?
+        if (buttons.getAttribute('data-wide-moved') === '1') return true;
 
-        // Создаём flex-обёртку
-        var wrapper = document.createElement('div');
-        wrapper.className = 'wide-title-row';
-
-        // Вставляем обёртку на место заголовка
-        title.parentNode.insertBefore(wrapper, title);
-
-        // Перемещаем заголовок и кнопку внутрь
-        wrapper.appendChild(title);
-        wrapper.appendChild(playBtn);
+        // Вставляем кнопки перед реакциями
+        reactions.parentNode.insertBefore(buttons, reactions);
+        buttons.setAttribute('data-wide-moved', '1');
 
         return true;
     }
@@ -218,7 +170,7 @@
     function trySwap(attemptsLeft) {
         if (attemptsLeft <= 0) return;
         var posterDone = swapPoster();
-        var btnDone = movePlayButton();
+        var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) return;
         setTimeout(function () { trySwap(attemptsLeft - 1); }, 150);
     }
