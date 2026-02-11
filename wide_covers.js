@@ -77,8 +77,8 @@
 
         // --- Blur на фоновый backdrop под постером ---
         '.full-start__background {',
-        '  filter: blur(20px) brightness(0.7) !important;',
-        '  -webkit-filter: blur(20px) brightness(0.7) !important;',
+        '  filter: blur(20px) brightness(0.4) !important;',
+        '  -webkit-filter: blur(20px) brightness(0.4) !important;',
         '}',
 
         // --- Кнопки: текст всегда видим ---
