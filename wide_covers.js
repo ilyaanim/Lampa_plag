@@ -278,18 +278,17 @@
         if (!yt.length) return [];
 
         var scored = yt.map(function (v, idx) {
-            var s = 0;
-            if (v.type === 'Trailer') s += 100;
-            if (v.type === 'Teaser') s += 50;
-            if (v.official) s += 30;
-            // Новые трейлеры выше: published_at или порядок в массиве
+            // Тип: Trailer > Teaser > остальное
+            var typeScore = 0;
+            if (v.type === 'Trailer') typeScore = 2;
+            else if (v.type === 'Teaser') typeScore = 1;
             var date = v.published_at ? new Date(v.published_at).getTime() : idx;
-            return { video: v, score: s, date: date };
+            return { video: v, typeScore: typeScore, date: date };
         });
 
-        // Сначала по типу, потом по дате (новые первые)
+        // Сначала по типу, потом по дате (самый новый первый)
         scored.sort(function (a, b) {
-            if (b.score !== a.score) return b.score - a.score;
+            if (a.typeScore !== b.typeScore) return b.typeScore - a.typeScore;
             return b.date - a.date;
         });
         return scored.map(function (s) { return s.video; });
