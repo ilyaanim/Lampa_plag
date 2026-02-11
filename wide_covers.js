@@ -106,6 +106,8 @@
         '  border-top-right-radius: 2em !important;',
         '  opacity: 0 !important;',
         '  transition: opacity 1s ease !important;',
+        '  -webkit-mask-image: linear-gradient(to bottom, white 50%, transparent 100%) !important;',
+        '  mask-image: linear-gradient(to bottom, white 50%, transparent 100%) !important;',
         '}',
         '.wide-trailer-wrap.visible {',
         '  opacity: 1 !important;',
