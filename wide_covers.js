@@ -277,15 +277,21 @@
         var yt = videos.filter(function (v) { return v.site === 'YouTube'; });
         if (!yt.length) return [];
 
-        var scored = yt.map(function (v) {
+        var scored = yt.map(function (v, idx) {
             var s = 0;
-            if (v.type === 'Trailer') s += 10;
-            if (v.type === 'Teaser') s += 5;
-            if (v.official) s += 3;
-            return { video: v, score: s };
+            if (v.type === 'Trailer') s += 100;
+            if (v.type === 'Teaser') s += 50;
+            if (v.official) s += 30;
+            // Новые трейлеры выше: published_at или порядок в массиве
+            var date = v.published_at ? new Date(v.published_at).getTime() : idx;
+            return { video: v, score: s, date: date };
         });
 
-        scored.sort(function (a, b) { return b.score - a.score; });
+        // Сначала по типу, потом по дате (новые первые)
+        scored.sort(function (a, b) {
+            if (b.score !== a.score) return b.score - a.score;
+            return b.date - a.date;
+        });
         return scored.map(function (s) { return s.video; });
     }
 
