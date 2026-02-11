@@ -5,83 +5,77 @@
     var STYLE_ID = 'wide-covers-plugin-style';
 
     // ==========================================
-    //  CSS: Full Detail View — wide poster layout
+    //  CSS: wide poster layout with !important
     // ==========================================
     var css = `
-        /* ===== Full Detail View: wide poster on top, text below ===== */
-
         body.wide-covers--enabled .full-start-new__body {
-            flex-direction: column;
-            align-items: stretch;
+            flex-direction: column !important;
+            align-items: stretch !important;
         }
 
         body.wide-covers--enabled .full-start-new__left {
-            width: 100%;
-            max-width: 100%;
-            margin-right: 0;
-            margin-bottom: 1.5em;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-right: 0 !important;
+            margin-bottom: 1.5em !important;
         }
 
         body.wide-covers--enabled .full-start-new__poster {
-            padding-bottom: 45%;
-            border-radius: 1.2em;
-            overflow: hidden;
+            padding-bottom: 45% !important;
+            border-radius: 1.2em !important;
+            overflow: hidden !important;
         }
 
         body.wide-covers--enabled .full-start-new__img {
-            object-fit: cover;
-            object-position: center 20%;
-            border-radius: 1.2em;
+            object-fit: cover !important;
+            object-position: center 20% !important;
+            border-radius: 1.2em !important;
         }
 
         body.wide-covers--enabled .full-start-new__right {
-            margin-top: 0;
+            margin-top: 0 !important;
         }
 
         body.wide-covers--enabled .full-start-new__title {
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
+            -webkit-line-clamp: 2 !important;
+            line-clamp: 2 !important;
         }
 
         body.wide-covers--enabled .full-start-new__description {
-            width: 100%;
+            width: 100% !important;
         }
     `;
 
     // ==========================================
-    //  Helper: build TMDB image URL
+    //  TMDB image URL
     // ==========================================
     function tmdbImg(path, size) {
         if (!path) return '';
         size = size || 'w780';
-        if (window.Lampa && Lampa.TMDB && typeof Lampa.TMDB.img === 'function') {
-            return Lampa.TMDB.img(path, size);
-        }
-        if (window.Lampa && Lampa.Api && typeof Lampa.Api.img === 'function') {
-            return Lampa.Api.img(path, size);
-        }
+        try {
+            if (Lampa.TMDB && Lampa.TMDB.img) return Lampa.TMDB.img(path, size);
+        } catch (e) {}
+        try {
+            if (Lampa.Api && Lampa.Api.img) return Lampa.Api.img(path, size);
+        } catch (e) {}
         return 'https://image.tmdb.org/t/p/' + size + path;
     }
 
-    // ==========================================
-    //  Check if plugin is enabled
-    // ==========================================
     function isEnabled() {
         return Lampa.Storage.get(STORAGE_KEY, 'true') === 'true';
     }
 
-    // ==========================================
-    //  Update body class
-    // ==========================================
     function updateBodyClass() {
-        document.body.classList.toggle('wide-covers--enabled', isEnabled());
+        if (isEnabled()) {
+            document.body.classList.add('wide-covers--enabled');
+        } else {
+            document.body.classList.remove('wide-covers--enabled');
+        }
     }
 
-    // ==========================================
-    //  Inject CSS
-    // ==========================================
     function injectCSS() {
-        if (document.getElementById(STYLE_ID)) return;
+        var existing = document.getElementById(STYLE_ID);
+        if (existing) existing.remove();
 
         var style = document.createElement('style');
         style.id = STYLE_ID;
@@ -90,120 +84,68 @@
     }
 
     // ==========================================
-    //  Swap poster to backdrop on Full Detail page
+    //  Swap poster image to backdrop via direct DOM
+    // ==========================================
+    function swapPoster() {
+        if (!isEnabled()) return;
+
+        // Find ALL poster images on page
+        var imgs = document.querySelectorAll('.full-start-new .full--poster');
+
+        imgs.forEach(function (img) {
+            if (img.dataset.wideSwapped) return;
+
+            // Get movie data from current activity
+            var movie = null;
+            try {
+                var act = Lampa.Activity.active();
+                if (act && act.params) movie = act.params.movie;
+            } catch (e) {}
+
+            if (!movie || !movie.backdrop_path) return;
+
+            img.dataset.wideSwapped = '1';
+
+            var backdropUrl = tmdbImg(movie.backdrop_path, 'w1280');
+
+            img.onload = function () {
+                var poster = img.closest('.full-start-new__poster');
+                if (poster) poster.classList.add('loaded');
+            };
+
+            img.src = backdropUrl;
+        });
+    }
+
+    // ==========================================
+    //  Hook: Lampa 'full' event
     // ==========================================
     function hookFullDetail() {
         Lampa.Listener.follow('full', function (e) {
             if (e.type === 'complite') {
-                if (!isEnabled()) return;
+                updateBodyClass();
 
-                var movie = e.data && e.data.movie;
-                if (!movie || !movie.backdrop_path) return;
-
-                var backdropUrl = tmdbImg(movie.backdrop_path, 'w1280');
-
-                // Find the poster image in the full detail page
-                try {
-                    var render = e.object.activity.render();
-                    var img = render.find('.full--poster');
-
-                    if (img.length && img[0]) {
-                        var posterEl = render.find('.full-start-new__poster');
-
-                        // Set backdrop image
-                        img[0].onload = function () {
-                            posterEl.addClass('loaded');
-                        };
-
-                        img[0].src = backdropUrl;
-                    }
-                } catch (ex) {
-                    console.warn('[Wide Covers] Error swapping poster:', ex);
-                }
+                // Delay to ensure DOM is ready
+                setTimeout(swapPoster, 50);
+                setTimeout(swapPoster, 300);
+                setTimeout(swapPoster, 800);
             }
         });
     }
 
     // ==========================================
-    //  Also observe DOM for poster images
-    //  (fallback in case Listener doesn't catch it)
+    //  Hook: activity changes
     // ==========================================
-    function observeFullPage() {
-        var observer = new MutationObserver(function (mutations) {
-            if (!isEnabled()) return;
+    function hookActivity() {
+        Lampa.Listener.follow('activity', function (e) {
+            if (e.type === 'start' && e.component === 'full') {
+                updateBodyClass();
 
-            for (var i = 0; i < mutations.length; i++) {
-                var added = mutations[i].addedNodes;
-                for (var j = 0; j < added.length; j++) {
-                    var node = added[j];
-                    if (node.nodeType !== 1) continue;
-
-                    // Check if a full-start-new block appeared
-                    var fullBlock = null;
-                    if (node.classList && node.classList.contains('full-start-new')) {
-                        fullBlock = node;
-                    } else if (node.querySelector) {
-                        fullBlock = node.querySelector('.full-start-new');
-                    }
-
-                    if (fullBlock) {
-                        processFullBlock(fullBlock);
-                    }
-                }
+                setTimeout(swapPoster, 100);
+                setTimeout(swapPoster, 500);
+                setTimeout(swapPoster, 1500);
             }
         });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    }
-
-    function processFullBlock(block) {
-        if (!isEnabled()) return;
-        if (block.dataset.wideCoverDone) return;
-        block.dataset.wideCoverDone = '1';
-
-        var img = block.querySelector('.full--poster');
-        if (!img) return;
-
-        // Try to get movie data from the activity
-        // The img src might already be set to poster — we need backdrop_path
-        // We'll watch for the src to be set and then swap it
-        var swapped = false;
-
-        function trySwap() {
-            if (swapped) return;
-
-            // Get the current activity's movie data
-            try {
-                var activity = Lampa.Activity.active();
-                var movie = activity && activity.params && activity.params.movie;
-                if (movie && movie.backdrop_path) {
-                    swapped = true;
-                    var backdropUrl = tmdbImg(movie.backdrop_path, 'w1280');
-                    var posterEl = block.querySelector('.full-start-new__poster');
-
-                    img.onload = function () {
-                        if (posterEl) posterEl.classList.add('loaded');
-                    };
-
-                    img.src = backdropUrl;
-                }
-            } catch (ex) {
-                // ignore
-            }
-        }
-
-        // Watch for img src changes
-        var imgObserver = new MutationObserver(function () {
-            trySwap();
-        });
-        imgObserver.observe(img, { attributes: true, attributeFilter: ['src'] });
-
-        // Also try immediately
-        setTimeout(trySwap, 100);
-        setTimeout(trySwap, 500);
     }
 
     // ==========================================
@@ -211,7 +153,7 @@
     // ==========================================
     function addSettings() {
         Lampa.Lang.add({
-            wide_covers_title: {
+            wide_covers_enabled_label: {
                 ru: 'Широкий постер',
                 en: 'Wide Poster',
                 uk: 'Широкий постер',
@@ -222,18 +164,12 @@
                 en: 'On movie page: wide backdrop on top, info below',
                 uk: 'На сторінці фільму: широкий backdrop зверху, інформація знизу',
                 be: 'На старонцы фільма: шырокі backdrop зверху, інфармацыя знізу'
-            },
-            wide_covers_enabled_label: {
-                ru: 'Широкий постер',
-                en: 'Wide Poster',
-                uk: 'Широкий постер',
-                be: 'Шырокі пастэр'
             }
         });
 
         Lampa.Params.select(STORAGE_KEY, {
-            'true': '#{settings_param_enabled}',
-            'false': '#{settings_param_disabled}'
+            'true': Lampa.Lang.translate('settings_param_enabled') || 'Вкл',
+            'false': Lampa.Lang.translate('settings_param_disabled') || 'Выкл'
         }, 'true');
 
         var templateHtml = '<div class="settings-param selector" data-name="' + STORAGE_KEY + '" data-type="select">' +
@@ -268,10 +204,11 @@
         injectCSS();
         updateBodyClass();
         hookFullDetail();
-        observeFullPage();
+        hookActivity();
         addSettings();
 
-        console.log('[Wide Covers] Plugin v2.0.0 loaded');
+        // Also try swapping on any existing page
+        setTimeout(swapPoster, 200);
     }
 
     if (window.appready) {
