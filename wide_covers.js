@@ -55,7 +55,7 @@
         '.full-start-new__right {',
         '  position: relative !important;',
         '  z-index: 2 !important;',
-        '  margin-top: -19em !important;',
+        '  margin-top: -30em !important;',
         '  padding-left: 1.5em !important;',
         '  padding-right: 1.5em !important;',
         '}',
@@ -75,6 +75,12 @@
         '}',
         '.full-start-new {',
         '  padding-bottom: 1em !important;',
+        '}',
+
+        // --- Blur на фоновый backdrop под постером ---
+        '.full-start__background {',
+        '  filter: blur(20px) !important;',
+        '  -webkit-filter: blur(20px) !important;',
         '}',
 
         // --- Title row: заголовок + кнопка ---
