@@ -112,17 +112,14 @@
         '.wide-trailer-wrap.visible {',
         '  opacity: 1 !important;',
         '}',
-        '.wide-trailer-wrap iframe,',
-        '.wide-trailer-wrap > div {',
+        '.wide-trailer-wrap video {',
         '  position: absolute !important;',
-        '  top: 50% !important;',
-        '  left: 50% !important;',
-        '  width: 140% !important;',
-        '  height: 140% !important;',
-        '  transform: translate(-50%, -50%) !important;',
-        '  -webkit-transform: translate(-50%, -50%) !important;',
+        '  top: 0 !important;',
+        '  left: 0 !important;',
+        '  width: 100% !important;',
+        '  height: 100% !important;',
+        '  object-fit: cover !important;',
         '  pointer-events: none !important;',
-        '  border: none !important;',
         '}',
         '.full-start-new__poster.trailer-playing .full-start-new__img {',
         '  opacity: 0 !important;',
@@ -296,35 +293,77 @@
         return scored.map(function (s) { return s.video; });
     }
 
-    // Загрузить YouTube IFrame API если ещё не загружен
-    function ensureYTAPI(callback) {
-        if (window.YT && window.YT.Player) {
-            callback();
-            return;
-        }
+    // Piped API — получить прямую ссылку на видео
+    var PIPED_INSTANCES = [
+        'https://pipedapi.kavin.rocks',
+        'https://pipedapi.adminforge.de',
+        'https://api.piped.yt'
+    ];
 
-        // Может уже загружается
-        if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-            var checkInterval = setInterval(function () {
-                if (window.YT && window.YT.Player) {
-                    clearInterval(checkInterval);
-                    callback();
+    function fetchDirectUrl(videoId, callback) {
+        var tried = 0;
+
+        function tryNext() {
+            if (tried >= PIPED_INSTANCES.length) {
+                console.log('[Wide Covers] all Piped instances failed');
+                callback(null);
+                return;
+            }
+
+            var apiUrl = PIPED_INSTANCES[tried] + '/streams/' + videoId;
+            tried++;
+
+            console.log('[Wide Covers] trying Piped:', apiUrl);
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', apiUrl);
+            xhr.timeout = 6000;
+            xhr.onload = function () {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+
+                    // Ищем mp4 поток с аудио (не videoOnly)
+                    var streams = (data.videoStreams || []).filter(function (s) {
+                        return !s.videoOnly && s.mimeType && s.mimeType.indexOf('video/mp4') !== -1;
+                    });
+
+                    // Сортируем по качеству (720p предпочтительно)
+                    streams.sort(function (a, b) {
+                        var qa = parseInt(a.quality) || 0;
+                        var qb = parseInt(b.quality) || 0;
+                        // Предпочитаем 720p, затем ближайшее к нему
+                        var da = Math.abs(qa - 720);
+                        var db = Math.abs(qb - 720);
+                        return da - db;
+                    });
+
+                    if (streams.length && streams[0].url) {
+                        console.log('[Wide Covers] got direct URL:', streams[0].quality, streams[0].mimeType);
+                        callback(streams[0].url);
+                        return;
+                    }
+
+                    // Fallback: HLS stream
+                    if (data.hls) {
+                        console.log('[Wide Covers] got HLS URL');
+                        callback(data.hls);
+                        return;
+                    }
+
+                    console.log('[Wide Covers] no suitable stream from this instance');
+                    tryNext();
+                } catch (e) {
+                    console.log('[Wide Covers] Piped parse error:', e);
+                    tryNext();
                 }
-            }, 200);
-            setTimeout(function () { clearInterval(checkInterval); }, 10000);
-            return;
+            };
+            xhr.onerror = xhr.ontimeout = function () {
+                console.log('[Wide Covers] Piped request failed');
+                tryNext();
+            };
+            xhr.send();
         }
 
-        // Загружаем
-        var oldCallback = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = function () {
-            if (oldCallback) oldCallback();
-            callback();
-        };
-
-        var tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(tag);
+        tryNext();
     }
 
     function loadTrailer() {
@@ -338,98 +377,94 @@
         if (!movie || !movie.id) return;
 
         var mediaType = getMediaType();
-        console.log('[Wide Covers] loadTrailer: mediaType=', mediaType);
-
         trailerState.active = true;
 
         fetchTrailers(movie.id, mediaType, function (videos) {
             console.log('[Wide Covers] fetchTrailers result:', videos.length, 'videos');
-            if (!trailerState.active) { console.log('[Wide Covers] not active anymore'); return; }
+            if (!trailerState.active) return;
 
             var sorted = sortTrailers(videos);
             console.log('[Wide Covers] ALL trailers:');
             sorted.forEach(function (v, i) {
-                console.log('[Wide Covers]  #' + i + ': ' + v.type + ' | ' + v.name + ' | ' + (v.published_at || 'no date') + ' | key=' + v.key + ' | official=' + v.official);
+                console.log('[Wide Covers]  #' + i + ': ' + v.type + ' | ' + v.name + ' | ' + (v.published_at || 'no date') + ' | key=' + v.key);
             });
             if (!sorted.length) return;
 
             trailerState.trailerList = sorted;
             trailerState.currentIndex = 0;
 
-            console.log('[Wide Covers] loading YT API...');
-            ensureYTAPI(function () {
-                console.log('[Wide Covers] YT API ready, active=', trailerState.active);
-                if (!trailerState.active) return;
-                tryPlayTrailer(poster);
-            });
+            tryPlayTrailer(poster);
         });
     }
 
     function tryPlayTrailer(poster) {
         if (trailerState.currentIndex >= trailerState.trailerList.length) { console.log('[Wide Covers] no more trailers'); return; }
-        if (trailerState.currentIndex >= 3) { console.log('[Wide Covers] max attempts reached'); return; }
+        if (trailerState.currentIndex >= 3) return;
         if (!trailerState.active) return;
 
         var videoId = trailerState.trailerList[trailerState.currentIndex].key;
         console.log('[Wide Covers] tryPlayTrailer #' + trailerState.currentIndex + ': ' + videoId);
 
-        // Создаём контейнер
+        fetchDirectUrl(videoId, function (directUrl) {
+            if (!trailerState.active) return;
+
+            if (directUrl) {
+                playWithVideo(poster, directUrl);
+            } else {
+                // Fallback: следующий трейлер
+                console.log('[Wide Covers] no direct URL, trying next trailer');
+                trailerState.currentIndex++;
+                tryPlayTrailer(poster);
+            }
+        });
+    }
+
+    function playWithVideo(poster, url) {
         var wrap = document.createElement('div');
         wrap.className = 'wide-trailer-wrap';
 
-        var playerDiv = document.createElement('div');
-        playerDiv.id = 'wide-trailer-player-' + Date.now();
-        wrap.appendChild(playerDiv);
+        var video = document.createElement('video');
+        video.setAttribute('autoplay', '');
+        video.setAttribute('muted', '');
+        video.setAttribute('playsinline', '');
+        video.setAttribute('preload', 'auto');
+        video.muted = true;
+        video.loop = false;
+        video.src = url;
 
+        wrap.appendChild(video);
         poster.appendChild(wrap);
         trailerState.wrap = wrap;
 
-        // Создаём YT.Player
-        console.log('[Wide Covers] creating YT.Player for div #' + playerDiv.id);
-        trailerState.player = new YT.Player(playerDiv.id, {
-            videoId: videoId,
-            playerVars: {
-                autoplay: 1,
-                mute: 1,
-                controls: 0,
-                showinfo: 0,
-                rel: 0,
-                modestbranding: 1,
-                playsinline: 1,
-                iv_load_policy: 3,
-                disablekb: 1,
-                fs: 0
-            },
-            events: {
-                onReady: function (event) {
-                    console.log('[Wide Covers] YT onReady');
-                    event.target.mute();
-                    event.target.playVideo();
+        video.addEventListener('canplay', function () {
+            console.log('[Wide Covers] video canplay');
+        });
 
-                    trailerState.timer = setTimeout(function () {
-                        if (!trailerState.active) return;
-                        if (trailerState.wrap !== wrap) return;
-                        console.log('[Wide Covers] showing trailer');
-                        wrap.classList.add('visible');
-                        poster.classList.add('trailer-playing');
-                    }, 5000);
-                },
-                onError: function (event) {
-                    console.log('[Wide Covers] YT onError:', event.data);
-                    cleanupCurrentTrailer();
-                    trailerState.currentIndex++;
-                    tryPlayTrailer(poster);
-                },
-                onStateChange: function (event) {
-                    console.log('[Wide Covers] YT state:', event.data);
-                    if (event.data === YT.PlayerState.ENDED) {
-                        if (wrap.classList.contains('visible')) {
-                            wrap.classList.remove('visible');
-                            poster.classList.remove('trailer-playing');
-                        }
-                    }
-                }
+        video.addEventListener('error', function () {
+            console.log('[Wide Covers] video error, trying next');
+            cleanupCurrentTrailer();
+            trailerState.currentIndex++;
+            tryPlayTrailer(poster);
+        });
+
+        video.addEventListener('ended', function () {
+            if (wrap.classList.contains('visible')) {
+                wrap.classList.remove('visible');
+                poster.classList.remove('trailer-playing');
             }
+        });
+
+        // Буфер 5 сек, затем показываем
+        trailerState.timer = setTimeout(function () {
+            if (!trailerState.active) return;
+            if (trailerState.wrap !== wrap) return;
+            console.log('[Wide Covers] showing trailer');
+            wrap.classList.add('visible');
+            poster.classList.add('trailer-playing');
+        }, 5000);
+
+        video.play().catch(function (e) {
+            console.log('[Wide Covers] video play error:', e);
         });
     }
 
