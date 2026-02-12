@@ -65,6 +65,12 @@
         '  padding-right: 1.5em !important;',
         '}',
 
+        // --- Убрать маску скролла на странице фильма ---
+        '.scroll--mask:has(.full-start-new) {',
+        '  -webkit-mask-image: none !important;',
+        '  mask-image: none !important;',
+        '}',
+
         // --- Выровнять секции ниже постера ---
         '.full-start-new ~ div,',
         '.full-start-new ~ section {',
@@ -112,9 +118,6 @@
         '  gap: 2em !important;',
         '  padding-left: 1.5em !important;',
         '  padding-right: 1.5em !important;',
-        '  -webkit-mask-image: none !important;',
-        '  mask-image: none !important;',
-        '  opacity: 1 !important;',
         '}',
         '.wide-descr-row .full-descr {',
         '  flex: 1 !important;',
@@ -125,9 +128,6 @@
         '  display: flex !important;',
         '  gap: 1.2em !important;',
         '  flex-shrink: 0 !important;',
-        '  -webkit-mask-image: none !important;',
-        '  mask-image: none !important;',
-        '  opacity: 1 !important;',
         '}',
         '.wide-cast__person {',
         '  display: flex !important;',
@@ -141,9 +141,6 @@
         '  border-radius: 50% !important;',
         '  object-fit: cover !important;',
         '  background: #3e3e3e !important;',
-        '  -webkit-mask-image: none !important;',
-        '  mask-image: none !important;',
-        '  opacity: 1 !important;',
         '}',
         '.wide-cast__name {',
         '  margin-top: 0.4em !important;',
