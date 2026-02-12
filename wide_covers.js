@@ -347,7 +347,7 @@
             var spans = details.querySelectorAll('span');
             for (var m = 0; m < spans.length; m++) {
                 var clone = spans[m].cloneNode(true);
-                clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6); margin-left:0.8em;';
+                clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6); margin-left:0.4em;';
                 rateLine.appendChild(clone);
             }
             details.style.display = 'none';
