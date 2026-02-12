@@ -153,6 +153,20 @@
         '  margin: 0 !important;',
         '  color: rgba(255,255,255,0.6) !important;',
         '}',
+        // --- Точка-разделитель ---
+        '.wide-dot {',
+        '  display: inline-flex !important;',
+        '  align-items: center !important;',
+        '  justify-content: center !important;',
+        '  width: 0.3em !important;',
+        '  height: 0.3em !important;',
+        '  margin: 0 0.5em !important;',
+        '  background: rgba(255,255,255,0.4) !important;',
+        '  border-radius: 50% !important;',
+        '  font-size: 0 !important;',
+        '  vertical-align: middle !important;',
+        '  flex-shrink: 0 !important;',
+        '}',
         '.wide-avg-rate {',
         '  display: inline-flex !important;',
         '  align-items: center !important;',
@@ -512,8 +526,6 @@
             }
             var dot = document.createElement('span');
             dot.className = 'wide-dot';
-            dot.textContent = '·';
-            dot.style.cssText = 'display:inline-block; margin:0 0.4em; color:rgba(255,255,255,0.35); font-size:1.3em; vertical-align:middle; line-height:1;';
             visible[d].parentNode.insertBefore(dot, visible[d]);
         }
     }
