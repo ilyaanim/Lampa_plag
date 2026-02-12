@@ -142,16 +142,27 @@
         '.full-start-new__rate-line {',
         '  text-shadow: none !important;',
         '  margin-bottom: 0.6em !important;',
+        '  align-items: center !important;',
+        '}',
+        // --- Единый размер шрифта для всех элементов rate-line (кроме рейтинга) ---
+        '.full-start-new__rate-line > *:not(.wide-avg-rate) {',
+        '  font-size: 1.1em !important;',
         '}',
         '.wide-duration-badge {',
         '  display: inline-block !important;',
-        '  border: 1px solid rgba(255,255,255,0.25) !important;',
-        '  border-radius: 0.5em !important;',
-        '  padding: 0.25em 0.5em !important;',
-        '  font-size: 1.05em !important;',
-        '  color: rgba(255,255,255,0.8) !important;',
-        '  line-height: 1.2 !important;',
+        '  font-size: 1.12em !important;',
+        '  color: rgba(255,255,255,0.6) !important;',
         '  vertical-align: middle !important;',
+        '}',
+        // --- Убрать обводки у нативных бейджей Lampa (18+, Released и т.д.) ---
+        '.full-start-new__rate-line .full-start__pg,',
+        '.full-start-new__rate-line [class*="pg"],',
+        '.full-start-new__rate-line [class*="status"] {',
+        '  border: none !important;',
+        '  background: none !important;',
+        '  padding: 0 !important;',
+        '  font-size: 1.12em !important;',
+        '  color: rgba(255,255,255,0.6) !important;',
         '}',
         '.wide-avg-rate {',
         '  display: inline-flex !important;',
@@ -428,8 +439,9 @@
         if (details) {
             var spans = details.querySelectorAll('span');
             var seasonKeys = ['Сезон', 'Серии', 'Серия', 'Season', 'Episode'];
-            // Длительность: "02:11", "1:30", "54 мин", "1 ч 30 мин"
             var durationRe = /^\d{1,2}:\d{2}$|мин|час|min|hr/;
+            var qualityHigh = ['4k', '4К', 'uhd', '2160'];
+            var qualityMid = ['1080', 'fhd', 'fullhd', 'full hd', 'bdrip', 'bluray', 'blu-ray', 'web-dl', 'webdl', 'remux'];
 
             for (var m = 0; m < spans.length; m++) {
                 var text = spans[m].textContent.trim();
@@ -441,16 +453,44 @@
                 }
                 var isDuration = !isSeason && durationRe.test(text);
 
-                if (!isSeason && !isDuration) continue;
-
-                var clone = spans[m].cloneNode(true);
-                clone.setAttribute('data-wide-detail', '1');
-                if (isDuration) {
-                    clone.className = 'wide-duration-badge';
-                } else {
-                    clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
+                // Определяем качество
+                var isQuality = false;
+                var qualityLabel = '';
+                if (!isSeason && !isDuration) {
+                    var lower = text.toLowerCase();
+                    if (lower.indexOf('качество') !== -1 || lower.indexOf('quality') !== -1) {
+                        isQuality = true;
+                        var is4k = false, is1080 = false;
+                        for (var q = 0; q < qualityHigh.length; q++) {
+                            if (lower.indexOf(qualityHigh[q].toLowerCase()) !== -1) { is4k = true; break; }
+                        }
+                        if (!is4k) {
+                            for (var r = 0; r < qualityMid.length; r++) {
+                                if (lower.indexOf(qualityMid[r].toLowerCase()) !== -1) { is1080 = true; break; }
+                            }
+                        }
+                        qualityLabel = is4k ? '4K' : is1080 ? '1080p' : 'Low';
+                    }
                 }
-                rateLine.appendChild(clone);
+
+                if (!isSeason && !isDuration && !isQuality) continue;
+
+                if (isQuality) {
+                    var qBadge = document.createElement('span');
+                    qBadge.setAttribute('data-wide-detail', '1');
+                    qBadge.textContent = qualityLabel;
+                    qBadge.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
+                    rateLine.appendChild(qBadge);
+                } else {
+                    var clone = spans[m].cloneNode(true);
+                    clone.setAttribute('data-wide-detail', '1');
+                    if (isDuration) {
+                        clone.className = 'wide-duration-badge';
+                    } else {
+                        clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
+                    }
+                    rateLine.appendChild(clone);
+                }
             }
             details.style.display = 'none';
         }
@@ -468,7 +508,7 @@
             textNodes[n].remove();
         }
 
-        // Добавляем один пробел между ВИДИМЫМИ элементами
+        // Добавляем маленькую точку-разделитель между ВИДИМЫМИ элементами
         var children = rateLine.children;
         var visible = [];
         for (var v = 0; v < children.length; v++) {
@@ -476,7 +516,10 @@
             if (cs.display !== 'none') visible.push(children[v]);
         }
         for (var d = 1; d < visible.length; d++) {
-            visible[d].style.marginLeft = '0.5em';
+            var dot = document.createElement('span');
+            dot.textContent = '·';
+            dot.style.cssText = 'margin:0 0.4em; color:rgba(255,255,255,0.3); font-size:1em;';
+            visible[d].parentNode.insertBefore(dot, visible[d]);
         }
     }
 
