@@ -76,30 +76,23 @@
         '  line-clamp: 2 !important;',
         '  text-shadow: none !important;',
         '}',
-        // --- Логотип вместо текста ---
+        // --- Логотип на постере (под плашкой TV) ---
         '.full-start-new__title.has-logo {',
-        '  display: block !important;',
-        '  -webkit-line-clamp: unset !important;',
-        '  line-clamp: unset !important;',
-        '  overflow: visible !important;',
-        '  -webkit-box-orient: unset !important;',
-        '  font-size: 0 !important;',
+        '  display: none !important;',
         '}',
-        '.full-start-new__title.has-logo {',
-        '  margin-bottom: 1rem !important;',
-        '}',
-        '.full-start-new__title .wide-logo {',
-        '  max-width: 35rem !important;',
-        '  max-height: 12rem !important;',
+        '.wide-poster-logo {',
+        '  max-width: 26rem !important;',
+        '  max-height: 9rem !important;',
         '  width: auto !important;',
         '  height: auto !important;',
         '  object-fit: contain !important;',
         '  object-position: left center !important;',
         '  display: block !important;',
         '  filter: none !important;',
+        '  margin-top: 0.6em !important;',
         '}',
         '.full-start-new__tagline {',
-        '  font-size: 1.2em !important;',
+        '  display: none !important;',
         '}',
         '.full-start-new__description {',
         '  width: 100% !important;',
@@ -188,12 +181,17 @@
         '  display: none !important;',
         '}',
 
-        // --- Плашка TV + год/страна на постере ---
+        // --- Плашка TV + год/страна + лого на постере ---
         '.wide-poster-info {',
         '  position: absolute !important;',
         '  top: 1.2em !important;',
         '  left: 1.2em !important;',
         '  z-index: 3 !important;',
+        '  display: flex !important;',
+        '  flex-direction: column !important;',
+        '  align-items: flex-start !important;',
+        '}',
+        '.wide-poster-info__row {',
         '  display: flex !important;',
         '  align-items: center !important;',
         '  gap: 0.5em !important;',
@@ -304,22 +302,24 @@
         var wrap = document.createElement('div');
         wrap.className = 'wide-poster-info';
 
-        // Переносим badge (TV) если есть
-        var badge = poster.querySelector('.card__type');
-        if (badge) wrap.appendChild(badge);
+        // Строка с badge + год/страна
+        var row = document.createElement('div');
+        row.className = 'wide-poster-info__row';
 
-        // Копируем текст из head (год, страна)
+        var badge = poster.querySelector('.card__type');
+        if (badge) row.appendChild(badge);
+
         var headText = head.textContent.trim();
         if (headText) {
             var span = document.createElement('span');
             span.className = 'wide-head-text';
             span.textContent = headText;
-            wrap.appendChild(span);
+            row.appendChild(span);
         }
 
+        wrap.appendChild(row);
         poster.appendChild(wrap);
 
-        // Скрываем оригинальный head
         head.style.display = 'none';
     }
 
@@ -528,17 +528,19 @@
     //  10. Заменить заголовок на логотип
     // ==========================================
     function fetchAndSetLogo() {
+        var posterInfo = document.querySelector('.wide-poster-info');
+        if (!posterInfo) return;
+        if (posterInfo.querySelector('.wide-poster-logo')) return;
+
         var titleEl = document.querySelector('.full-start-new__title');
-        if (!titleEl) { console.log('[Wide Covers] fetchLogo: no titleEl'); return; }
+        if (!titleEl) return;
         if (titleEl.getAttribute('data-logo-done') === '1') return;
         titleEl.setAttribute('data-logo-done', '1');
 
         var movie = getMovie();
-        if (!movie || !movie.id) { console.log('[Wide Covers] fetchLogo: no movie', movie); return; }
+        if (!movie || !movie.id) return;
 
         var mediaType = getMediaType();
-        console.log('[Wide Covers] fetchLogo:', movie.title || movie.name, 'id=' + movie.id, 'type=' + mediaType);
-
         var apiKey = '4ef0d7355d9ffb5151e987764708ce96';
         try {
             if (window.Lampa && Lampa.TMDB && Lampa.TMDB.key) apiKey = Lampa.TMDB.key();
@@ -552,27 +554,21 @@
         } catch (e) {}
 
         var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/images?api_key=' + apiKey + '&include_image_language=' + lang + ',en,null';
-        console.log('[Wide Covers] fetchLogo URL:', url);
 
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url);
         xhr.timeout = 8000;
         xhr.onload = function () {
-            console.log('[Wide Covers] fetchLogo response status:', xhr.status);
             try {
                 var data = JSON.parse(xhr.responseText);
-                console.log('[Wide Covers] fetchLogo logos count:', data.logos ? data.logos.length : 0);
                 if (!data.logos || !data.logos.length) return;
 
-                // Выбираем лого: приоритет en, затем любое
                 var logos = data.logos;
                 var best = null;
                 for (var i = 0; i < logos.length; i++) {
                     if (logos[i].iso_639_1 === 'en') { best = logos[i]; break; }
                 }
                 if (!best) best = logos[0];
-
-                console.log('[Wide Covers] fetchLogo best:', best.file_path, 'lang=' + best.iso_639_1);
 
                 // Получаем proxy prefix из текущего постера
                 var posterImg = document.querySelector('.full-start-new .full--poster');
@@ -591,31 +587,24 @@
                     logoSrc = 'https://image.tmdb.org/t/p/w500' + best.file_path;
                 }
 
-                console.log('[Wide Covers] fetchLogo src:', logoSrc);
-
-                // Проверяем, что titleEl ещё на месте
-                titleEl = document.querySelector('.full-start-new__title');
-                if (!titleEl) { console.log('[Wide Covers] fetchLogo: titleEl gone'); return; }
-
                 var img = new Image();
-                img.className = 'wide-logo';
+                img.className = 'wide-poster-logo';
                 img.alt = movie.title || movie.name || '';
                 img.onload = function () {
-                    console.log('[Wide Covers] fetchLogo: image loaded OK');
-                    titleEl.textContent = '';
-                    titleEl.appendChild(img);
-                    titleEl.classList.add('has-logo');
+                    // Вставляем лого в постер-инфо (под плашкой)
+                    var target = document.querySelector('.wide-poster-info');
+                    if (target && !target.querySelector('.wide-poster-logo')) {
+                        target.appendChild(img);
+                        // Скрываем текстовый title
+                        var title = document.querySelector('.full-start-new__title');
+                        if (title) title.classList.add('has-logo');
+                    }
                 };
-                img.onerror = function () {
-                    console.log('[Wide Covers] fetchLogo: image load FAILED');
-                };
+                img.onerror = function () {};
                 img.src = logoSrc;
-            } catch (e) {
-                console.log('[Wide Covers] fetchLogo parse error:', e);
-            }
+            } catch (e) {}
         };
-        xhr.onerror = function () { console.log('[Wide Covers] fetchLogo XHR error'); };
-        xhr.ontimeout = function () { console.log('[Wide Covers] fetchLogo XHR timeout'); };
+        xhr.onerror = xhr.ontimeout = function () {};
         xhr.send();
     }
 
