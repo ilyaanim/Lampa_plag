@@ -431,51 +431,89 @@
     }
 
     // ==========================================
-    //  8. Переместить «Следующая серия» / «Осталось» выше рейтинга
+    //  8. Вынести «Следующая серия» / «Осталось» из rate-line в отдельный блок выше
     // ==========================================
     function moveNextEpisodeInfo() {
-        var right = document.querySelector('.full-start-new__right');
         var rateLine = document.querySelector('.full-start-new__rate-line');
-        if (!right || !rateLine) return;
-        if (right.getAttribute('data-next-moved') === '1') return;
-        right.setAttribute('data-next-moved', '1');
+        if (!rateLine) return;
+        if (rateLine.getAttribute('data-next-extracted') === '1') return;
+        rateLine.setAttribute('data-next-extracted', '1');
 
-        // Классы стандартных элементов — пропускаем
-        var skip = [
-            'full-start-new__title', 'full-start-new__tagline',
-            'full-start-new__head', 'full-start-new__rate-line',
-            'full-start-new__details', 'full-start-new__buttons',
-            'full-start-new__reactions'
-        ];
+        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining'];
+        var extracted = [];
 
-        var keywords = ['Следующая', 'Осталось', 'серия', 'серий', 'Next', 'episode', 'Remaining'];
-        var children = right.children;
-        var toMove = [];
-
-        for (var i = 0; i < children.length; i++) {
-            var el = children[i];
-
-            // Пропускаем известные блоки
-            var isKnown = false;
-            for (var k = 0; k < skip.length; k++) {
-                if (el.classList.contains(skip[k])) { isKnown = true; break; }
+        // Ищем внутри rate-line все элементы (span, div, etc.)
+        var allEls = rateLine.querySelectorAll('*');
+        for (var i = 0; i < allEls.length; i++) {
+            var el = allEls[i];
+            // Берём только элементы первого уровня вложенности в rateLine,
+            // или сам элемент если он прямой потомок
+            var directChild = el;
+            while (directChild.parentNode && directChild.parentNode !== rateLine) {
+                directChild = directChild.parentNode;
             }
-            if (isKnown) continue;
+            if (directChild.parentNode !== rateLine) continue;
 
-            // Проверяем текст на ключевые слова
             var text = el.textContent || '';
-            for (var m = 0; m < keywords.length; m++) {
-                if (text.indexOf(keywords[m]) !== -1) {
-                    toMove.push(el);
+            for (var k = 0; k < keywords.length; k++) {
+                if (text.indexOf(keywords[k]) !== -1) {
+                    if (extracted.indexOf(directChild) === -1) {
+                        extracted.push(directChild);
+                    }
                     break;
                 }
             }
         }
 
-        for (var j = 0; j < toMove.length; j++) {
-            toMove[j].classList.add('wide-next-info');
-            rateLine.parentNode.insertBefore(toMove[j], rateLine);
+        // Также ищем среди прямых детей .full-start-new__right
+        // (на случай если они вне rate-line)
+        var right = document.querySelector('.full-start-new__right');
+        if (right) {
+            var skipCls = [
+                'full-start-new__title', 'full-start-new__tagline',
+                'full-start-new__head', 'full-start-new__rate-line',
+                'full-start-new__details', 'full-start-new__buttons',
+                'full-start-new__reactions'
+            ];
+            var children = right.children;
+            for (var c = 0; c < children.length; c++) {
+                var ch = children[c];
+                var isKnown = false;
+                for (var s = 0; s < skipCls.length; s++) {
+                    if (ch.classList.contains(skipCls[s])) { isKnown = true; break; }
+                }
+                if (isKnown) continue;
+
+                var chText = ch.textContent || '';
+                for (var kk = 0; kk < keywords.length; kk++) {
+                    if (chText.indexOf(keywords[kk]) !== -1) {
+                        if (extracted.indexOf(ch) === -1) extracted.push(ch);
+                        break;
+                    }
+                }
+            }
         }
+
+        if (!extracted.length) return;
+
+        // Создаём отдельный блок над rate-line
+        var infoBlock = document.createElement('div');
+        infoBlock.className = 'wide-next-info';
+
+        for (var j = 0; j < extracted.length; j++) {
+            // Убираем предшествующие разделители ●
+            var prev = extracted[j].previousSibling;
+            if (prev && prev.nodeType === 3 && prev.textContent.indexOf('●') !== -1) {
+                prev.remove();
+            }
+            var next = extracted[j].nextSibling;
+            if (next && next.nodeType === 3 && next.textContent.indexOf('●') !== -1) {
+                next.remove();
+            }
+            infoBlock.appendChild(extracted[j]);
+        }
+
+        rateLine.parentNode.insertBefore(infoBlock, rateLine);
     }
 
     // ==========================================
