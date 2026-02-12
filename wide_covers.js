@@ -110,6 +110,8 @@
         '  display: flex !important;',
         '  align-items: flex-start !important;',
         '  gap: 2em !important;',
+        '  padding-left: 1.5em !important;',
+        '  padding-right: 1.5em !important;',
         '}',
         '.wide-descr-row .full-descr {',
         '  flex: 1 !important;',
