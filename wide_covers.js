@@ -345,17 +345,11 @@
                 console.log('[Wide Covers] fetchLogo logos count:', data.logos ? data.logos.length : 0);
                 if (!data.logos || !data.logos.length) return;
 
-                // Выбираем лого: предпочитаем язык пользователя, затем en, затем null
+                // Выбираем лого: приоритет en, затем любое
                 var logos = data.logos;
                 var best = null;
                 for (var i = 0; i < logos.length; i++) {
-                    var l = logos[i];
-                    if (l.iso_639_1 === lang) { best = l; break; }
-                }
-                if (!best) {
-                    for (var j = 0; j < logos.length; j++) {
-                        if (logos[j].iso_639_1 === 'en') { best = logos[j]; break; }
-                    }
+                    if (logos[i].iso_639_1 === 'en') { best = logos[i]; break; }
                 }
                 if (!best) best = logos[0];
 
