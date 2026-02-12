@@ -238,14 +238,15 @@
     // ==========================================
     function fetchAndSetLogo() {
         var titleEl = document.querySelector('.full-start-new__title');
-        if (!titleEl) return;
+        if (!titleEl) { console.log('[Wide Covers] fetchLogo: no titleEl'); return; }
         if (titleEl.getAttribute('data-logo-done') === '1') return;
         titleEl.setAttribute('data-logo-done', '1');
 
         var movie = getMovie();
-        if (!movie || !movie.id) return;
+        if (!movie || !movie.id) { console.log('[Wide Covers] fetchLogo: no movie', movie); return; }
 
         var mediaType = getMediaType();
+        console.log('[Wide Covers] fetchLogo:', movie.title || movie.name, 'id=' + movie.id, 'type=' + mediaType);
 
         var apiKey = '4ef0d7355d9ffb5151e987764708ce96';
         try {
@@ -260,13 +261,16 @@
         } catch (e) {}
 
         var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/images?api_key=' + apiKey + '&include_image_language=' + lang + ',en,null';
+        console.log('[Wide Covers] fetchLogo URL:', url);
 
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url);
         xhr.timeout = 8000;
         xhr.onload = function () {
+            console.log('[Wide Covers] fetchLogo response status:', xhr.status);
             try {
                 var data = JSON.parse(xhr.responseText);
+                console.log('[Wide Covers] fetchLogo logos count:', data.logos ? data.logos.length : 0);
                 if (!data.logos || !data.logos.length) return;
 
                 // Выбираем лого: предпочитаем язык пользователя, затем en, затем null
@@ -282,6 +286,8 @@
                     }
                 }
                 if (!best) best = logos[0];
+
+                console.log('[Wide Covers] fetchLogo best:', best.file_path, 'lang=' + best.iso_639_1);
 
                 // Получаем proxy prefix из текущего постера
                 var posterImg = document.querySelector('.full-start-new .full--poster');
@@ -300,22 +306,31 @@
                     logoSrc = 'https://image.tmdb.org/t/p/w500' + best.file_path;
                 }
 
+                console.log('[Wide Covers] fetchLogo src:', logoSrc);
+
                 // Проверяем, что titleEl ещё на месте
                 titleEl = document.querySelector('.full-start-new__title');
-                if (!titleEl) return;
+                if (!titleEl) { console.log('[Wide Covers] fetchLogo: titleEl gone'); return; }
 
                 var img = new Image();
                 img.className = 'wide-logo';
                 img.alt = movie.title || movie.name || '';
                 img.onload = function () {
+                    console.log('[Wide Covers] fetchLogo: image loaded OK');
                     titleEl.textContent = '';
                     titleEl.appendChild(img);
                     titleEl.classList.add('has-logo');
                 };
+                img.onerror = function () {
+                    console.log('[Wide Covers] fetchLogo: image load FAILED');
+                };
                 img.src = logoSrc;
-            } catch (e) {}
+            } catch (e) {
+                console.log('[Wide Covers] fetchLogo parse error:', e);
+            }
         };
-        xhr.onerror = xhr.ontimeout = function () {};
+        xhr.onerror = function () { console.log('[Wide Covers] fetchLogo XHR error'); };
+        xhr.ontimeout = function () { console.log('[Wide Covers] fetchLogo XHR timeout'); };
         xhr.send();
     }
 
