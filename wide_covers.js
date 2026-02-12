@@ -161,6 +161,13 @@
         '.full-start-new {',
         '  padding-bottom: 1em !important;',
         '}',
+        // --- Инфо о следующей серии (перенесено выше рейтинга) ---
+        '.wide-next-info {',
+        '  color: #fff !important;',
+        '  opacity: 1 !important;',
+        '  font-size: 0.85em !important;',
+        '  margin-bottom: 0.5em !important;',
+        '}',
 
         // --- Blur на фоновый backdrop ---
         '.full-start__background {',
@@ -419,7 +426,34 @@
     }
 
     // ==========================================
-    //  8. Определить тип медиа (movie / tv)
+    //  8. Переместить «Следующая серия» / «Осталось» выше рейтинга
+    // ==========================================
+    function moveNextEpisodeInfo() {
+        var right = document.querySelector('.full-start-new__right');
+        var rateLine = document.querySelector('.full-start-new__rate-line');
+        if (!right || !rateLine) return;
+        if (right.getAttribute('data-next-moved') === '1') return;
+        right.setAttribute('data-next-moved', '1');
+
+        var children = right.children;
+        var toMove = [];
+
+        for (var i = 0; i < children.length; i++) {
+            var text = children[i].textContent || '';
+            if (text.indexOf('Следующая') !== -1 || text.indexOf('Осталось') !== -1 ||
+                text.indexOf('Next') !== -1 || text.indexOf('Remaining') !== -1) {
+                toMove.push(children[i]);
+            }
+        }
+
+        for (var j = 0; j < toMove.length; j++) {
+            toMove[j].classList.add('wide-next-info');
+            rateLine.parentNode.insertBefore(toMove[j], rateLine);
+        }
+    }
+
+    // ==========================================
+    //  9. Определить тип медиа (movie / tv)
     // ==========================================
     function getMediaType() {
         try {
@@ -619,6 +653,7 @@
             moveHeadToPoster();
             removeGenresFromDetails();
             mergeRatings();
+            moveNextEpisodeInfo();
             hideDetailTitle();
             fetchAndSetLogo();
             fetchAndShowCast();
