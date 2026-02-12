@@ -144,8 +144,8 @@
         '  margin-bottom: 0.6em !important;',
         '  align-items: center !important;',
         '}',
-        // --- Единый стиль для ВСЕХ элементов rate-line (кроме рейтинга) ---
-        '.full-start-new__rate-line > *:not(.wide-avg-rate) {',
+        // --- Единый стиль для ВСЕХ элементов rate-line (кроме рейтинга и точек) ---
+        '.full-start-new__rate-line > *:not(.wide-avg-rate):not(.wide-dot) {',
         '  font-size: 1.1em !important;',
         '  border: none !important;',
         '  background: none !important;',
@@ -511,6 +511,7 @@
                 continue;
             }
             var dot = document.createElement('span');
+            dot.className = 'wide-dot';
             dot.textContent = '·';
             dot.style.cssText = 'margin:0 0.25em; color:rgba(255,255,255,0.3); font-size:0.8em;';
             visible[d].parentNode.insertBefore(dot, visible[d]);
