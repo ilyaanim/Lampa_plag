@@ -534,7 +534,7 @@
     }
 
     // ==========================================
-    //  8. Вынести «Следующая серия» / «Осталось» из rate-line в отдельный блок выше
+    //  8. Вынести «Следующая серия» / «Осталось» в отдельный блок выше rate-line
     // ==========================================
     function moveNextEpisodeInfo() {
         var rateLine = document.querySelector('.full-start-new__rate-line');
@@ -542,78 +542,68 @@
         if (rateLine.getAttribute('data-next-extracted') === '1') return;
         rateLine.setAttribute('data-next-extracted', '1');
 
-        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining'];
+        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining', 'серия'];
         var extracted = [];
 
-        // Ищем внутри rate-line все элементы (span, div, etc.)
-        var allEls = rateLine.querySelectorAll('*');
-        for (var i = 0; i < allEls.length; i++) {
-            var el = allEls[i];
-            // Берём только элементы первого уровня вложенности в rateLine,
-            // или сам элемент если он прямой потомок
-            var directChild = el;
-            while (directChild.parentNode && directChild.parentNode !== rateLine) {
-                directChild = directChild.parentNode;
-            }
-            if (directChild.parentNode !== rateLine) continue;
-
-            var text = el.textContent || '';
+        // Вспомогательная: содержит ли текст одно из ключевых слов
+        function matchesKeyword(text) {
             for (var k = 0; k < keywords.length; k++) {
-                if (text.indexOf(keywords[k]) !== -1) {
-                    if (extracted.indexOf(directChild) === -1) {
-                        extracted.push(directChild);
-                    }
-                    break;
+                if (text.indexOf(keywords[k]) !== -1) return true;
+            }
+            return false;
+        }
+
+        // 1. Ищем внутри rate-line (прямые потомки)
+        var rateChildren = rateLine.children;
+        for (var i = 0; i < rateChildren.length; i++) {
+            if (matchesKeyword(rateChildren[i].textContent || '')) {
+                if (extracted.indexOf(rateChildren[i]) === -1) extracted.push(rateChildren[i]);
+            }
+        }
+
+        // 2. Ищем внутри .full-start-new__details (может быть скрыт или нет)
+        var details = document.querySelector('.full-start-new__details');
+        if (details) {
+            var spans = details.querySelectorAll('span');
+            for (var d = 0; d < spans.length; d++) {
+                if (matchesKeyword(spans[d].textContent || '')) {
+                    if (extracted.indexOf(spans[d]) === -1) extracted.push(spans[d]);
                 }
             }
         }
 
-        // Также ищем среди прямых детей .full-start-new__right
-        // (на случай если они вне rate-line)
+        // 3. Ищем среди ВСЕХ потомков .full-start-new__right
         var right = document.querySelector('.full-start-new__right');
         if (right) {
-            var skipCls = [
-                'full-start-new__title', 'full-start-new__tagline',
-                'full-start-new__head', 'full-start-new__rate-line',
-                'full-start-new__details', 'full-start-new__buttons',
-                'full-start-new__reactions'
-            ];
-            var children = right.children;
-            for (var c = 0; c < children.length; c++) {
-                var ch = children[c];
-                var isKnown = false;
-                for (var s = 0; s < skipCls.length; s++) {
-                    if (ch.classList.contains(skipCls[s])) { isKnown = true; break; }
-                }
-                if (isKnown) continue;
-
-                var chText = ch.textContent || '';
-                for (var kk = 0; kk < keywords.length; kk++) {
-                    if (chText.indexOf(keywords[kk]) !== -1) {
-                        if (extracted.indexOf(ch) === -1) extracted.push(ch);
-                        break;
-                    }
+            var allDesc = right.querySelectorAll('*');
+            for (var a = 0; a < allDesc.length; a++) {
+                var el = allDesc[a];
+                var t = (el.textContent || '').trim();
+                // Только элементы, чей СОБСТВЕННЫЙ текст (без детей) содержит ключевое слово
+                // или это листовой элемент
+                if (!el.children.length && matchesKeyword(t)) {
+                    if (extracted.indexOf(el) === -1) extracted.push(el);
                 }
             }
         }
 
-        if (!extracted.length) return;
+        if (!extracted.length) {
+            console.log('[wide] moveNextEpisodeInfo: nothing found');
+            return;
+        }
+
+        console.log('[wide] moveNextEpisodeInfo: found', extracted.length, 'elements');
 
         // Создаём отдельный блок над rate-line
         var infoBlock = document.createElement('div');
         infoBlock.className = 'wide-next-info';
 
         for (var j = 0; j < extracted.length; j++) {
-            // Убираем предшествующие разделители ●
-            var prev = extracted[j].previousSibling;
-            if (prev && prev.nodeType === 3 && prev.textContent.indexOf('●') !== -1) {
-                prev.remove();
-            }
-            var next = extracted[j].nextSibling;
-            if (next && next.nodeType === 3 && next.textContent.indexOf('●') !== -1) {
-                next.remove();
-            }
-            infoBlock.appendChild(extracted[j]);
+            var clone = extracted[j].cloneNode(true);
+            clone.style.cssText = 'display:block !important; visibility:visible !important; opacity:1 !important; color:#fff !important;';
+            infoBlock.appendChild(clone);
+            // Скрываем оригинал
+            extracted[j].style.display = 'none';
         }
 
         rateLine.parentNode.insertBefore(infoBlock, rateLine);
@@ -813,42 +803,30 @@
     //  8a. Повторная попытка вынести «Следующая серия»
     // ==========================================
     function retryNextEpisode() {
-        var rateLine = document.querySelector('.full-start-new__rate-line');
-        if (!rateLine) return;
-
         // Если уже есть блок wide-next-info с контентом — не трогаем
         var existing = document.querySelector('.wide-next-info');
         if (existing && existing.children.length > 0) return;
 
-        // Ищем ключевые слова среди прямых детей rate-line
-        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining'];
-        var found = false;
-        var els = rateLine.querySelectorAll('*');
-        for (var i = 0; i < els.length; i++) {
-            var text = els[i].textContent || '';
-            for (var k = 0; k < keywords.length; k++) {
-                if (text.indexOf(keywords[k]) !== -1) { found = true; break; }
-            }
-            if (found) break;
-        }
+        var rateLine = document.querySelector('.full-start-new__rate-line');
+        if (!rateLine) return;
 
-        // Также проверяем детей .full-start-new__right
-        if (!found) {
-            var right = document.querySelector('.full-start-new__right');
-            if (right) {
-                var children = right.children;
-                for (var c = 0; c < children.length; c++) {
-                    var chText = children[c].textContent || '';
-                    for (var kk = 0; kk < keywords.length; kk++) {
-                        if (chText.indexOf(keywords[kk]) !== -1) { found = true; break; }
-                    }
-                    if (found) break;
+        // Ищем ключевые слова ВЕЗДЕ в .full-start-new__right
+        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining', 'серия'];
+        var found = false;
+        var right = document.querySelector('.full-start-new__right');
+        if (right) {
+            var allDesc = right.querySelectorAll('*');
+            for (var i = 0; i < allDesc.length; i++) {
+                var text = allDesc[i].textContent || '';
+                for (var k = 0; k < keywords.length; k++) {
+                    if (text.indexOf(keywords[k]) !== -1) { found = true; break; }
                 }
+                if (found) break;
             }
         }
 
         if (found) {
-            // Сбрасываем флаг и повторно вызываем
+            console.log('[wide] retryNextEpisode: found schedule info, re-extracting');
             rateLine.removeAttribute('data-next-extracted');
             moveNextEpisodeInfo();
         }
@@ -864,8 +842,8 @@
         if (posterDone && btnDone) {
             moveHeadToPoster();
             removeGenresFromDetails();
-            mergeRatings();
             moveNextEpisodeInfo();
+            mergeRatings();
             hideDetailTitle();
             fetchAndSetLogo();
             fetchAndShowCast();
