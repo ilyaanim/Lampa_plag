@@ -230,14 +230,23 @@
         var el = document.querySelector('.full-start-new');
         if (!el) return;
 
-        // Пройти по всем родителям и добавить класс + inline стиль
+        // Пройти по всем родителям и снять маску
         var node = el.parentNode;
         while (node && node !== document.body) {
             node.classList.add('wide-no-mask');
             node.style.setProperty('-webkit-mask-image', 'none', 'important');
             node.style.setProperty('mask-image', 'none', 'important');
+            node.style.setProperty('opacity', '1', 'important');
             node = node.parentNode;
         }
+    }
+
+    // Повторять снятие маски несколько раз (Лампа может переставить)
+    function removeScrollMaskRepeat() {
+        removeScrollMask();
+        setTimeout(removeScrollMask, 500);
+        setTimeout(removeScrollMask, 1500);
+        setTimeout(removeScrollMask, 3000);
     }
 
     // ==========================================
@@ -540,6 +549,9 @@
                 }
 
                 row.appendChild(castDiv);
+
+                // Повторно снять маску после вставки актёров
+                removeScrollMask();
             } catch (e) {}
         };
         xhr.onerror = xhr.ontimeout = function () {};
@@ -649,7 +661,7 @@
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) {
-            removeScrollMask();
+            removeScrollMaskRepeat();
             moveHeadToPoster();
             removeGenresFromDetails();
             mergeRatings();
