@@ -423,33 +423,27 @@
         badge.innerHTML = '<svg class="wide-avg-star" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5c.4 0 .7.2.9.6l2.5 5.1 5.6.8c.4.1.7.3.8.7.1.3 0 .7-.3.9l-4.1 4 1 5.6c.1.4 0 .7-.3 1-.3.2-.7.2-1 .1L12 18.8l-5 2.6c-.4.2-.7.2-1-.1-.3-.2-.4-.6-.3-1l1-5.6-4.1-4c-.3-.3-.4-.6-.3-.9.1-.4.4-.6.8-.7l5.6-.8 2.5-5.1c.2-.4.5-.6.9-.6z" stroke-linejoin="round"/></svg> ' + avg;
         rateLine.insertBefore(badge, rateLine.firstChild);
 
-        // Переносим сезоны, серии и длительность из деталей в строку рейтингов
+        // Переносим все оставшиеся детали (жанры уже удалены ранее)
         var details = document.querySelector('.full-start-new__details');
         if (details) {
             var spans = details.querySelectorAll('span');
             var seasonKeys = ['Сезон', 'Серии', 'Серия', 'Season', 'Episode'];
-            var durationKeys = ['мин', 'min', 'час', 'hr', 'hour'];
             for (var m = 0; m < spans.length; m++) {
                 var text = spans[m].textContent.trim();
                 if (!text) continue;
 
-                var isSeason = false, isDuration = false;
+                var isSeason = false;
                 for (var a = 0; a < seasonKeys.length; a++) {
                     if (text.indexOf(seasonKeys[a]) !== -1) { isSeason = true; break; }
                 }
-                if (!isSeason) {
-                    for (var b = 0; b < durationKeys.length; b++) {
-                        if (text.indexOf(durationKeys[b]) !== -1) { isDuration = true; break; }
-                    }
-                }
-                if (!isSeason && !isDuration) continue;
 
                 var clone = spans[m].cloneNode(true);
                 clone.setAttribute('data-wide-detail', '1');
-                if (isDuration) {
-                    clone.className = 'wide-duration-badge';
-                } else {
+                if (isSeason) {
                     clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
+                } else {
+                    // Всё остальное (длительность и т.д.) — как badge
+                    clone.className = 'wide-duration-badge';
                 }
                 rateLine.appendChild(clone);
             }
