@@ -19,35 +19,38 @@ Original layout: `.full-start-new__body` is flex horizontal
 - Right: `.full-start-new__right` (title, ratings, buttons)
 
 Plugin changes to cinematic vertical layout:
-- Wide backdrop (50% aspect ratio) with gradient overlay (transparent → dark)
-- Text overlaid on poster via negative margin (-12em)
+- Wide backdrop (50% aspect ratio) with gradient fade (mask-image)
+- Text overlaid on poster via negative margin (-30em)
+- Background backdrop blurred and darkened (blur 20px, brightness 0.4)
+- Reactions hidden, button labels collapsed (except Play)
 
 ### Sections:
 1. **CSS Injection** (immediate, with !important)
    - `.full-start-new__body` → `flex-direction: column`
    - `.full-start-new__left` → `width: 100%`
-   - `.full-start-new__poster` → `padding-bottom: 50%` + `::after` gradient
-   - `.full-start-new__right` → `margin-top: -12em; z-index: 2`
-   - `.wide-title-row` — flex-обёртка для заголовка + кнопки Play
-   - `.wide-title-row .button--play` — белая кнопка Netflix-стиля с текстом
+   - `.full-start-new__poster` → `padding-bottom: 50%`, rounded top corners (2em)
+   - `.full-start-new__poster .full-start-new__img` → `mask-image` gradient fade
+   - `.full-start-new__right` → `margin-top: -30em; z-index: 2`
+   - `.full-start__background` → `blur(20px) brightness(0.4)`
+   - `.full-start-new__reactions` → `display: none`
+   - `.full-start-new__buttons .button--play span` → visible
+   - Other button spans → hidden (icon-only)
 
-2. **Image Swap** — Takes current poster img src, modifies URL:
+2. **Image Swap** — `swapPoster()`:
    - Preserves proxy prefix (`imagetmdb.com`) and query params (`?email=...`)
    - Replaces size (`w500` → `original`) and path (`poster_path` → `backdrop_path`)
    - Fallback chain: `original` → `w1280`
 
-3. **Play Button Move** — `movePlayButton()` (DOM manipulation):
-   - Finds `.button--play` in `.full-start-new__buttons`
-   - Creates `.wide-title-row` wrapper div
-   - Moves `.full-start-new__title` + `.button--play` into wrapper
-   - CSS forces `span` visible (overrides Lampa's default hide)
+3. **Buttons Reorder** — `moveButtonsBlock()`:
+   - Moves `.full-start-new__buttons` block above `.full-start-new__reactions`
 
-4. **Movie Data Access** — `Lampa.Activity.active().card` (primary)
-   - Activity structure: `{id, component, method, source, card, page, params, activity}`
-   - `act.card.backdrop_path` contains the TMDB backdrop file path
+4. **Movie Data Access** — `getMovie()`:
+   - Primary: `Lampa.Activity.active().card`
+   - Fallbacks: `act.params.movie`, `act.movie`, `act.data.movie`
 
 5. **Event Hooks** — `Lampa.Listener.follow('full', ...)` + `('activity', ...)`
-   - Also runs `trySwap()` immediately at plugin start (page may already be open)
+   - Runs `trySwap()` on `full:complite` and `activity:start`
+   - Also runs immediately at plugin start (page may already be open)
    - Retry: up to 30 attempts at 150ms intervals
 
 ### Lampa DOM structure (full detail view):
@@ -58,14 +61,12 @@ Plugin changes to cinematic vertical layout:
       .full-start-new__poster > img.full--poster
     .full-start-new__right
       .full-start-new__head
-      .wide-title-row              ← injected wrapper
-        .full-start-new__title     ← moved here
-        .button--play              ← moved here from __buttons
+      .full-start-new__title
       .full-start-new__tagline
       .full-start-new__rate-line
       .full-start-new__details
-      .full-start-new__reactions
-      .full-start-new__buttons     ← play button removed from here
+      .full-start-new__buttons     ← moved above reactions
+      .full-start-new__reactions   ← hidden via CSS
 ```
 
 ### Key Lampa internals:
