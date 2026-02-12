@@ -141,6 +141,7 @@
         '}',
         '.full-start-new__rate-line {',
         '  text-shadow: none !important;',
+        '  margin-bottom: 0.3em !important;',
         '}',
         '.wide-avg-rate {',
         '  display: inline-flex !important;',
@@ -182,7 +183,7 @@
 
         // --- Кнопки ---
         '.full-start-new__buttons {',
-        '  margin-top: 0.3em !important;',
+        '  margin-top: 0 !important;',
         '}',
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
