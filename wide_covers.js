@@ -107,6 +107,21 @@
         '.full-start-new__rate-line {',
         '  text-shadow: none !important;',
         '}',
+        '.wide-avg-rate {',
+        '  display: inline-flex !important;',
+        '  align-items: center !important;',
+        '  background: rgba(255,255,255,0.15) !important;',
+        '  border-radius: 0.5em !important;',
+        '  padding: 0.3em 0.7em !important;',
+        '  font-size: 1.3em !important;',
+        '  font-weight: 700 !important;',
+        '  color: #fff !important;',
+        '  gap: 0.3em !important;',
+        '}',
+        '.wide-avg-rate .wide-avg-star {',
+        '  color: #f5c518 !important;',
+        '  font-size: 1em !important;',
+        '}',
         '.full-start-new {',
         '  padding-bottom: 1em !important;',
         '}',
@@ -290,7 +305,64 @@
     }
 
     // ==========================================
-    //  7. Определить тип медиа
+    //  7. Заменить рейтинги на средний
+    // ==========================================
+    function mergeRatings() {
+        var rateLine = document.querySelector('.full-start-new__rate-line');
+        if (!rateLine) return;
+        if (rateLine.getAttribute('data-rates-merged') === '1') return;
+        rateLine.setAttribute('data-rates-merged', '1');
+
+        var rates = rateLine.querySelectorAll('.full-start__rate');
+        var values = [];
+        for (var i = 0; i < rates.length; i++) {
+            var divs = rates[i].querySelectorAll('div');
+            if (divs.length) {
+                var val = parseFloat(divs[0].textContent);
+                if (!isNaN(val) && val > 0) values.push(val);
+            }
+        }
+
+        if (!values.length) return;
+
+        var avg = 0;
+        for (var j = 0; j < values.length; j++) avg += values[j];
+        avg = (avg / values.length).toFixed(1);
+
+        // Убираем все отдельные рейтинги
+        for (var k = 0; k < rates.length; k++) {
+            rates[k].style.display = 'none';
+        }
+
+        // Вставляем средний рейтинг перед первым оставшимся элементом
+        var badge = document.createElement('span');
+        badge.className = 'wide-avg-rate';
+        badge.innerHTML = '<span class="wide-avg-star">★</span> ' + avg;
+        rateLine.insertBefore(badge, rateLine.firstChild);
+
+        // Переносим детали (сезоны, серии, время) в строку рейтингов
+        var details = document.querySelector('.full-start-new__details');
+        if (details) {
+            var spans = details.querySelectorAll('span');
+            for (var m = 0; m < spans.length; m++) {
+                var clone = spans[m].cloneNode(true);
+                clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6); margin-left:0.8em;';
+                rateLine.appendChild(clone);
+            }
+            details.style.display = 'none';
+        }
+
+        // Убираем разделители ● из rate-line
+        var walker = document.createTreeWalker(rateLine, NodeFilter.SHOW_TEXT, null, false);
+        var textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+        for (var n = 0; n < textNodes.length; n++) {
+            textNodes[n].textContent = textNodes[n].textContent.replace(/\s*●\s*/g, '');
+        }
+    }
+
+    // ==========================================
+    //  8. Определить тип медиа (movie / tv)
     // ==========================================
     function getMediaType() {
         try {
@@ -410,6 +482,7 @@
         if (posterDone && btnDone) {
             moveHeadToPoster();
             removeGenresFromDetails();
+            mergeRatings();
             fetchAndSetLogo();
             return;
         }
