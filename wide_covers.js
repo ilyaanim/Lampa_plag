@@ -101,6 +101,10 @@
         '.full-start-new__tagline {',
         '  font-size: 1.2em !important;',
         '}',
+        // --- Скрыть заголовок "Подробно" ---
+        '.full-start-new ~ .items-line:first-of-type > .items-line__title {',
+        '  display: none !important;',
+        '}',
         '.full-start-new__description {',
         '  width: 100% !important;',
         '}',
