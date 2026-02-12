@@ -102,7 +102,7 @@
         '  font-size: 1.2em !important;',
         '}',
         // --- Скрыть заголовок "Подробно" ---
-        '.full-start-new ~ .items-line:first-of-type > .items-line__title {',
+        '.full-start-new + .items-line > .items-line__title {',
         '  display: none !important;',
         '}',
         '.full-start-new__description {',
