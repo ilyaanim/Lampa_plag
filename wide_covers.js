@@ -96,7 +96,7 @@
         '  object-fit: contain !important;',
         '  object-position: left center !important;',
         '  display: block !important;',
-        '  filter: drop-shadow(0 0.1rem 0.3rem rgba(0,0,0,0.5)) !important;',
+        '  filter: none !important;',
         '}',
         '.full-start-new__tagline {',
         '  font-size: 1.2em !important;',
@@ -111,16 +111,17 @@
         '  display: inline-flex !important;',
         '  align-items: center !important;',
         '  background: rgba(255,255,255,0.15) !important;',
-        '  border-radius: 0.5em !important;',
-        '  padding: 0.3em 0.7em !important;',
+        '  border-radius: 0.8em !important;',
+        '  padding: 0.5em 0.7em !important;',
         '  font-size: 1.3em !important;',
         '  font-weight: 700 !important;',
         '  color: #fff !important;',
         '  gap: 0.3em !important;',
         '}',
         '.wide-avg-rate .wide-avg-star {',
-        '  color: #f5c518 !important;',
-        '  font-size: 1em !important;',
+        '  width: 1em !important;',
+        '  height: 1em !important;',
+        '  flex-shrink: 0 !important;',
         '}',
         '.full-start-new {',
         '  padding-bottom: 1em !important;',
@@ -337,7 +338,7 @@
         // Вставляем средний рейтинг перед первым оставшимся элементом
         var badge = document.createElement('span');
         badge.className = 'wide-avg-rate';
-        badge.innerHTML = '<span class="wide-avg-star">★</span> ' + avg;
+        badge.innerHTML = '<svg class="wide-avg-star" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5c.4 0 .7.2.9.6l2.5 5.1 5.6.8c.4.1.7.3.8.7.1.3 0 .7-.3.9l-4.1 4 1 5.6c.1.4 0 .7-.3 1-.3.2-.7.2-1 .1L12 18.8l-5 2.6c-.4.2-.7.2-1-.1-.3-.2-.4-.6-.3-1l1-5.6-4.1-4c-.3-.3-.4-.6-.3-.9.1-.4.4-.6.8-.7l5.6-.8 2.5-5.1c.2-.4.5-.6.9-.6z" stroke-linejoin="round"/></svg> ' + avg;
         rateLine.insertBefore(badge, rateLine.firstChild);
 
         // Переносим детали (сезоны, серии, время) в строку рейтингов
