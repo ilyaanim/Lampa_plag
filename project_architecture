@@ -3,8 +3,12 @@
 ## Overview
 Plugin for Lampa.mx that changes the Full Detail View (movie page) layout:
 - Wide backdrop image (original quality, up to 4K) with gradient overlay
-- Movie info (title, ratings, buttons) overlaid on the image
+- Movie info (title/logo, ratings, buttons) overlaid on the image
 - Netflix-style cinematic layout
+- TMDB logo instead of text title (English preferred)
+- Average rating badge (from TMDB, IMDB, KP)
+- Top 3 cast member cards next to description
+- Date/country badge on poster (next to TV badge)
 
 ## Files
 - `wide_covers.js` — Main plugin file (self-contained, single JS file)
@@ -21,37 +25,77 @@ Original layout: `.full-start-new__body` is flex horizontal
 Plugin changes to cinematic vertical layout:
 - Wide backdrop (50% aspect ratio) with gradient fade (mask-image)
 - Text overlaid on poster via negative margin (-30em)
+- 10% black gradient overlay on left side for text readability
 - Background backdrop blurred and darkened (blur 20px, brightness 0.4)
 - Reactions hidden, button labels collapsed (except Play)
+- TMDB logo replaces text title (English preferred, fallback to any)
+- Date/country info moved to poster (next to TV badge)
+- Genres removed from details line
+- Average rating from TMDB/IMDB/KP with rounded star icon
+- Seasons/episodes merged into rating line
+- "Подробно" section title hidden
+- Smaller description font with 3 circular actor cards to the right
 
 ### Sections:
 1. **CSS Injection** (immediate, with !important)
    - `.full-start-new__body` → `flex-direction: column`
    - `.full-start-new__left` → `width: 100%`
    - `.full-start-new__poster` → `padding-bottom: 50%`, rounded top corners (2em)
+   - `.full-start-new__poster::before` → 10% black left gradient overlay
    - `.full-start-new__poster .full-start-new__img` → `mask-image` gradient fade
    - `.full-start-new__right` → `margin-top: -30em; z-index: 2`
    - `.full-start__background` → `blur(20px) brightness(0.4)`
    - `.full-start-new__reactions` → `display: none`
    - `.full-start-new__buttons .button--play span` → visible
    - Other button spans → hidden (icon-only)
+   - `.wide-poster-info` → flex badge+date on poster
+   - `.wide-logo` → TMDB logo (max 35rem × 12rem)
+   - `.wide-avg-rate` → average rating badge with SVG star
+   - `.wide-descr-row` → flex container for description + cast
+   - `.wide-cast` → 3 circular actor cards
+   - Sections below poster → `position: relative; z-index: 3`
 
-2. **Image Swap** — `swapPoster()`:
+2. **Scroll Mask Removal** — `removeScrollMask()` + `startMaskRemoval()`:
+   - Walks up DOM from `.full-start-new`, removes `mask-image` from all parents
+   - Uses `requestAnimationFrame` loop to continuously counteract Lampa's
+     dynamic scroll mask re-application
+   - Auto-stops when leaving the detail page (`activity:destroy`)
+
+3. **Image Swap** — `swapPoster()`:
    - Preserves proxy prefix (`imagetmdb.com`) and query params (`?email=...`)
    - Replaces size (`w500` → `original`) and path (`poster_path` → `backdrop_path`)
    - Fallback chain: `original` → `w1280`
 
-3. **Buttons Reorder** — `moveButtonsBlock()`:
+4. **Buttons Reorder** — `moveButtonsBlock()`:
    - Moves `.full-start-new__buttons` block above `.full-start-new__reactions`
 
-4. **Movie Data Access** — `getMovie()`:
-   - Primary: `Lampa.Activity.active().card`
-   - Fallbacks: `act.params.movie`, `act.movie`, `act.data.movie`
+5. **Head to Poster** — `moveHeadToPoster()`:
+   - Creates `.wide-poster-info` on poster with TV badge + date/country text
 
-5. **Event Hooks** — `Lampa.Listener.follow('full', ...)` + `('activity', ...)`
-   - Runs `trySwap()` on `full:complite` and `activity:start`
-   - Also runs immediately at plugin start (page may already be open)
-   - Retry: up to 30 attempts at 150ms intervals
+6. **Genres Removal** — `removeGenresFromDetails()`:
+   - Removes genre spans (containing `|` but not `:`) from details
+
+7. **Rating Merge** — `mergeRatings()`:
+   - Calculates average from TMDB/IMDB/KP ratings
+   - Creates `.wide-avg-rate` badge with rounded SVG star
+   - Merges seasons/episodes info into rating line
+
+8. **Logo Display** — `fetchAndSetLogo()`:
+   - Fetches logos from TMDB `/images` endpoint (English priority)
+   - Replaces title text with `<img>` logo
+
+9. **Cast Display** — `fetchAndShowCast()`:
+   - Fetches `/credits` from TMDB, shows top 3 actors with photos
+   - Circular avatar cards with names, placed right of description
+
+10. **Movie Data Access** — `getMovie()`:
+    - Primary: `Lampa.Activity.active().card`
+    - Fallbacks: `act.params.movie`, `act.movie`, `act.data.movie`
+
+11. **Event Hooks** — `Lampa.Listener.follow('full', ...)` + `('activity', ...)`
+    - Runs `trySwap()` on `full:complite` and `activity:start`
+    - Stops mask removal on `activity:destroy`
+    - Retry: up to 30 attempts at 150ms intervals
 
 ### Lampa DOM structure (full detail view):
 ```
@@ -59,14 +103,18 @@ Plugin changes to cinematic vertical layout:
   .full-start-new__body
     .full-start-new__left
       .full-start-new__poster > img.full--poster
+        .wide-poster-info (injected: TV badge + date/country)
     .full-start-new__right
-      .full-start-new__head
-      .full-start-new__title
+      .full-start-new__title (replaced with .wide-logo if available)
       .full-start-new__tagline
-      .full-start-new__rate-line
-      .full-start-new__details
+      .full-start-new__rate-line (.wide-avg-rate + seasons/episodes)
+      .full-start-new__details (hidden after merge)
       .full-start-new__buttons     ← moved above reactions
       .full-start-new__reactions   ← hidden via CSS
+  .items-line (description section)
+    .wide-descr-row
+      .full-descr (description text)
+      .wide-cast (3 actor cards)
 ```
 
 ### Key Lampa internals:
@@ -74,3 +122,4 @@ Plugin changes to cinematic vertical layout:
 - URL format: `http://imagetmdb.com/t/p/{size}/{path}?email=...`
 - Activity API: `Lampa.Activity.active()` → `{card: {backdrop_path, poster_path, ...}}`
 - Events: `Lampa.Listener.follow('full', fn)` with `e.type === 'complite'`
+- TMDB API key: `Lampa.TMDB.key()` or hardcoded fallback

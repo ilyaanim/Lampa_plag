@@ -76,6 +76,8 @@
         '.full-start-new ~ section {',
         '  padding-left: 1.5em !important;',
         '  padding-right: 1.5em !important;',
+        '  position: relative !important;',
+        '  z-index: 3 !important;',
         '}',
         '.full-start-new__title {',
         '  -webkit-line-clamp: 2 !important;',
@@ -224,15 +226,19 @@
     document.head.appendChild(style);
 
     // ==========================================
-    //  2. Убрать маску скролла
+    //  2. Убрать маску скролла (непрерывно через rAF)
     // ==========================================
+    var _maskRAF = null;
+    var _maskedNodes = []; // запоминаем ноды, чтобы потом очистить
+
     function removeScrollMask() {
         var el = document.querySelector('.full-start-new');
         if (!el) return;
 
-        // Пройти по всем родителям и снять маску
+        _maskedNodes = [];
         var node = el.parentNode;
         while (node && node !== document.body) {
+            _maskedNodes.push(node);
             node.classList.add('wide-no-mask');
             node.style.setProperty('-webkit-mask-image', 'none', 'important');
             node.style.setProperty('mask-image', 'none', 'important');
@@ -241,12 +247,39 @@
         }
     }
 
-    // Повторять снятие маски несколько раз (Лампа может переставить)
-    function removeScrollMaskRepeat() {
+    function restoreScrollMask() {
+        for (var i = 0; i < _maskedNodes.length; i++) {
+            var node = _maskedNodes[i];
+            node.classList.remove('wide-no-mask');
+            node.style.removeProperty('-webkit-mask-image');
+            node.style.removeProperty('mask-image');
+            node.style.removeProperty('opacity');
+        }
+        _maskedNodes = [];
+    }
+
+    // Непрерывно снимать маску пока открыта страница деталей
+    function removeScrollMaskLoop() {
+        if (!document.querySelector('.full-start-new')) {
+            _maskRAF = null;
+            restoreScrollMask();
+            return;
+        }
         removeScrollMask();
-        setTimeout(removeScrollMask, 500);
-        setTimeout(removeScrollMask, 1500);
-        setTimeout(removeScrollMask, 3000);
+        _maskRAF = requestAnimationFrame(removeScrollMaskLoop);
+    }
+
+    function startMaskRemoval() {
+        if (_maskRAF) return;
+        removeScrollMaskLoop();
+    }
+
+    function stopMaskRemoval() {
+        if (_maskRAF) {
+            cancelAnimationFrame(_maskRAF);
+            _maskRAF = null;
+        }
+        restoreScrollMask();
     }
 
     // ==========================================
@@ -661,7 +694,7 @@
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) {
-            removeScrollMaskRepeat();
+            startMaskRemoval();
             moveHeadToPoster();
             removeGenresFromDetails();
             mergeRatings();
@@ -683,6 +716,7 @@
 
         Lampa.Listener.follow('activity', function (e) {
             if (e.type === 'start') trySwap(20);
+            if (e.type === 'destroy') stopMaskRemoval();
         });
     }
 
