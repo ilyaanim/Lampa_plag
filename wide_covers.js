@@ -145,7 +145,7 @@
         '}',
         '.wide-duration-badge {',
         '  display: inline-block !important;',
-        '  border: 1px solid rgba(255,255,255,0.4) !important;',
+        '  border: 1px solid rgba(255,255,255,0.25) !important;',
         '  border-radius: 0.5em !important;',
         '  padding: 0.25em 0.5em !important;',
         '  font-size: 1.05em !important;',
@@ -423,27 +423,32 @@
         badge.innerHTML = '<svg class="wide-avg-star" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.5c.4 0 .7.2.9.6l2.5 5.1 5.6.8c.4.1.7.3.8.7.1.3 0 .7-.3.9l-4.1 4 1 5.6c.1.4 0 .7-.3 1-.3.2-.7.2-1 .1L12 18.8l-5 2.6c-.4.2-.7.2-1-.1-.3-.2-.4-.6-.3-1l1-5.6-4.1-4c-.3-.3-.4-.6-.3-.9.1-.4.4-.6.8-.7l5.6-.8 2.5-5.1c.2-.4.5-.6.9-.6z" stroke-linejoin="round"/></svg> ' + avg;
         rateLine.insertBefore(badge, rateLine.firstChild);
 
-        // Переносим все оставшиеся детали (жанры уже удалены ранее)
+        // Переносим сезоны, серии и длительность из деталей
         var details = document.querySelector('.full-start-new__details');
         if (details) {
             var spans = details.querySelectorAll('span');
             var seasonKeys = ['Сезон', 'Серии', 'Серия', 'Season', 'Episode'];
+            // Длительность: "02:11", "1:30", "54 мин", "1 ч 30 мин"
+            var durationRe = /^\d{1,2}:\d{2}$|мин|час|min|hr/;
+
             for (var m = 0; m < spans.length; m++) {
                 var text = spans[m].textContent.trim();
-                if (!text) continue;
+                if (!text || text === '●' || text === '•') continue;
 
                 var isSeason = false;
                 for (var a = 0; a < seasonKeys.length; a++) {
                     if (text.indexOf(seasonKeys[a]) !== -1) { isSeason = true; break; }
                 }
+                var isDuration = !isSeason && durationRe.test(text);
+
+                if (!isSeason && !isDuration) continue;
 
                 var clone = spans[m].cloneNode(true);
                 clone.setAttribute('data-wide-detail', '1');
-                if (isSeason) {
-                    clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
-                } else {
-                    // Всё остальное (длительность и т.д.) — как badge
+                if (isDuration) {
                     clone.className = 'wide-duration-badge';
+                } else {
+                    clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
                 }
                 rateLine.appendChild(clone);
             }
