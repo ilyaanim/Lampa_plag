@@ -65,6 +65,12 @@
         '  padding-right: 1.5em !important;',
         '}',
 
+        // --- Убрать маску скролла ---
+        '.wide-no-mask {',
+        '  -webkit-mask-image: none !important;',
+        '  mask-image: none !important;',
+        '}',
+
         // --- Выровнять секции ниже постера ---
         '.full-start-new ~ div,',
         '.full-start-new ~ section {',
@@ -221,34 +227,16 @@
     //  2. Убрать маску скролла
     // ==========================================
     function removeScrollMask() {
-        // Ищем через closest
         var el = document.querySelector('.full-start-new');
-        if (el) {
-            var parent = el.closest('.scroll--mask');
-            if (parent) {
-                parent.style.webkitMaskImage = 'none';
-                parent.style.maskImage = 'none';
-            }
-        }
-        // Ищем все scroll--mask на странице как fallback
-        var masks = document.querySelectorAll('.scroll--mask');
-        for (var i = 0; i < masks.length; i++) {
-            if (masks[i].querySelector('.full-start-new')) {
-                masks[i].style.webkitMaskImage = 'none';
-                masks[i].style.maskImage = 'none';
-            }
-        }
-        // Проверяем также scroll__body и scroll__content
-        if (el) {
-            var node = el.parentNode;
-            while (node && node !== document.body) {
-                var cs = window.getComputedStyle(node);
-                if (cs.maskImage && cs.maskImage !== 'none') {
-                    node.style.webkitMaskImage = 'none';
-                    node.style.maskImage = 'none';
-                }
-                node = node.parentNode;
-            }
+        if (!el) return;
+
+        // Пройти по всем родителям и добавить класс + inline стиль
+        var node = el.parentNode;
+        while (node && node !== document.body) {
+            node.classList.add('wide-no-mask');
+            node.style.setProperty('-webkit-mask-image', 'none', 'important');
+            node.style.setProperty('mask-image', 'none', 'important');
+            node = node.parentNode;
         }
     }
 
