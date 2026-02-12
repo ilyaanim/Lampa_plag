@@ -513,7 +513,7 @@
             var dot = document.createElement('span');
             dot.className = 'wide-dot';
             dot.textContent = '·';
-            dot.style.cssText = 'margin:0 0.3em; color:rgba(255,255,255,0.35); font-size:1.1em;';
+            dot.style.cssText = 'display:inline-block; margin:0 0.4em; color:rgba(255,255,255,0.35); font-size:1.3em; vertical-align:middle; line-height:1;';
             visible[d].parentNode.insertBefore(dot, visible[d]);
         }
     }
