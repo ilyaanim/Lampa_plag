@@ -65,19 +65,11 @@
         '  padding-right: 1.5em !important;',
         '}',
 
-        // --- Убрать маску скролла ---
-        '.wide-no-mask {',
-        '  -webkit-mask-image: none !important;',
-        '  mask-image: none !important;',
-        '}',
-
         // --- Выровнять секции ниже постера ---
         '.full-start-new ~ div,',
         '.full-start-new ~ section {',
         '  padding-left: 1.5em !important;',
         '  padding-right: 1.5em !important;',
-        '  position: relative !important;',
-        '  z-index: 3 !important;',
         '}',
         '.full-start-new__title {',
         '  -webkit-line-clamp: 2 !important;',
@@ -226,64 +218,7 @@
     document.head.appendChild(style);
 
     // ==========================================
-    //  2. Убрать маску скролла (непрерывно через rAF)
-    // ==========================================
-    var _maskRAF = null;
-    var _maskedNodes = []; // запоминаем ноды, чтобы потом очистить
-
-    function removeScrollMask() {
-        var el = document.querySelector('.full-start-new');
-        if (!el) return;
-
-        _maskedNodes = [];
-        var node = el.parentNode;
-        while (node && node !== document.body) {
-            _maskedNodes.push(node);
-            node.classList.add('wide-no-mask');
-            node.style.setProperty('-webkit-mask-image', 'none', 'important');
-            node.style.setProperty('mask-image', 'none', 'important');
-            node.style.setProperty('opacity', '1', 'important');
-            node = node.parentNode;
-        }
-    }
-
-    function restoreScrollMask() {
-        for (var i = 0; i < _maskedNodes.length; i++) {
-            var node = _maskedNodes[i];
-            node.classList.remove('wide-no-mask');
-            node.style.removeProperty('-webkit-mask-image');
-            node.style.removeProperty('mask-image');
-            node.style.removeProperty('opacity');
-        }
-        _maskedNodes = [];
-    }
-
-    // Непрерывно снимать маску пока открыта страница деталей
-    function removeScrollMaskLoop() {
-        if (!document.querySelector('.full-start-new')) {
-            _maskRAF = null;
-            restoreScrollMask();
-            return;
-        }
-        removeScrollMask();
-        _maskRAF = requestAnimationFrame(removeScrollMaskLoop);
-    }
-
-    function startMaskRemoval() {
-        if (_maskRAF) return;
-        removeScrollMaskLoop();
-    }
-
-    function stopMaskRemoval() {
-        if (_maskRAF) {
-            cancelAnimationFrame(_maskRAF);
-            _maskRAF = null;
-        }
-        restoreScrollMask();
-    }
-
-    // ==========================================
-    //  3. Получить данные фильма из Activity
+    //  2. Получить данные фильма из Activity
     // ==========================================
     function getMovie() {
         try {
@@ -583,8 +518,6 @@
 
                 row.appendChild(castDiv);
 
-                // Повторно снять маску после вставки актёров
-                removeScrollMask();
             } catch (e) {}
         };
         xhr.onerror = xhr.ontimeout = function () {};
@@ -694,7 +627,6 @@
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) {
-            startMaskRemoval();
             moveHeadToPoster();
             removeGenresFromDetails();
             mergeRatings();
@@ -716,7 +648,6 @@
 
         Lampa.Listener.follow('activity', function (e) {
             if (e.type === 'start') trySwap(20);
-            if (e.type === 'destroy') stopMaskRemoval();
         });
     }
 

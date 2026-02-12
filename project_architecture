@@ -53,48 +53,40 @@ Plugin changes to cinematic vertical layout:
    - `.wide-avg-rate` → average rating badge with SVG star
    - `.wide-descr-row` → flex container for description + cast
    - `.wide-cast` → 3 circular actor cards
-   - Sections below poster → `position: relative; z-index: 3`
 
-2. **Scroll Mask Removal** — `removeScrollMask()` + `startMaskRemoval()`:
-   - Walks up DOM from `.full-start-new`, removes `mask-image` from all parents
-   - Uses `requestAnimationFrame` loop to continuously counteract Lampa's
-     dynamic scroll mask re-application
-   - Auto-stops when leaving the detail page (`activity:destroy`)
-
-3. **Image Swap** — `swapPoster()`:
+2. **Image Swap** — `swapPoster()`:
    - Preserves proxy prefix (`imagetmdb.com`) and query params (`?email=...`)
    - Replaces size (`w500` → `original`) and path (`poster_path` → `backdrop_path`)
    - Fallback chain: `original` → `w1280`
 
-4. **Buttons Reorder** — `moveButtonsBlock()`:
+3. **Buttons Reorder** — `moveButtonsBlock()`:
    - Moves `.full-start-new__buttons` block above `.full-start-new__reactions`
 
-5. **Head to Poster** — `moveHeadToPoster()`:
+4. **Head to Poster** — `moveHeadToPoster()`:
    - Creates `.wide-poster-info` on poster with TV badge + date/country text
 
-6. **Genres Removal** — `removeGenresFromDetails()`:
+5. **Genres Removal** — `removeGenresFromDetails()`:
    - Removes genre spans (containing `|` but not `:`) from details
 
-7. **Rating Merge** — `mergeRatings()`:
+6. **Rating Merge** — `mergeRatings()`:
    - Calculates average from TMDB/IMDB/KP ratings
    - Creates `.wide-avg-rate` badge with rounded SVG star
    - Merges seasons/episodes info into rating line
 
-8. **Logo Display** — `fetchAndSetLogo()`:
+7. **Logo Display** — `fetchAndSetLogo()`:
    - Fetches logos from TMDB `/images` endpoint (English priority)
    - Replaces title text with `<img>` logo
 
-9. **Cast Display** — `fetchAndShowCast()`:
+8. **Cast Display** — `fetchAndShowCast()`:
    - Fetches `/credits` from TMDB, shows top 3 actors with photos
    - Circular avatar cards with names, placed right of description
 
-10. **Movie Data Access** — `getMovie()`:
+9. **Movie Data Access** — `getMovie()`:
     - Primary: `Lampa.Activity.active().card`
     - Fallbacks: `act.params.movie`, `act.movie`, `act.data.movie`
 
-11. **Event Hooks** — `Lampa.Listener.follow('full', ...)` + `('activity', ...)`
+10. **Event Hooks** — `Lampa.Listener.follow('full', ...)` + `('activity', ...)`
     - Runs `trySwap()` on `full:complite` and `activity:start`
-    - Stops mask removal on `activity:destroy`
     - Retry: up to 30 attempts at 150ms intervals
 
 ### Lampa DOM structure (full detail view):
