@@ -103,6 +103,47 @@
         '}',
         '.full-start-new__description {',
         '  width: 100% !important;',
+        '  font-size: 1em !important;',
+        '}',
+        // --- Обёртка описание + актёры ---
+        '.wide-descr-row {',
+        '  display: flex !important;',
+        '  align-items: flex-start !important;',
+        '  gap: 2em !important;',
+        '}',
+        '.wide-descr-row .full-descr {',
+        '  flex: 1 !important;',
+        '  min-width: 0 !important;',
+        '  font-size: 0.95em !important;',
+        '}',
+        '.wide-cast {',
+        '  display: flex !important;',
+        '  gap: 1.2em !important;',
+        '  flex-shrink: 0 !important;',
+        '}',
+        '.wide-cast__person {',
+        '  display: flex !important;',
+        '  flex-direction: column !important;',
+        '  align-items: center !important;',
+        '  width: 5em !important;',
+        '}',
+        '.wide-cast__photo {',
+        '  width: 4.5em !important;',
+        '  height: 4.5em !important;',
+        '  border-radius: 50% !important;',
+        '  object-fit: cover !important;',
+        '  background: #3e3e3e !important;',
+        '}',
+        '.wide-cast__name {',
+        '  margin-top: 0.4em !important;',
+        '  font-size: 0.8em !important;',
+        '  text-align: center !important;',
+        '  color: rgba(255,255,255,0.7) !important;',
+        '  line-height: 1.2 !important;',
+        '  overflow: hidden !important;',
+        '  display: -webkit-box !important;',
+        '  -webkit-line-clamp: 2 !important;',
+        '  -webkit-box-orient: vertical !important;',
         '}',
         '.full-start-new__rate-line {',
         '  text-shadow: none !important;',
@@ -393,7 +434,96 @@
     }
 
     // ==========================================
-    //  7. Заменить заголовок на логотип
+    //  9. Загрузить 3 главных актёров рядом с описанием
+    // ==========================================
+    function fetchAndShowCast() {
+        var descrBody = document.querySelector('.full-descr');
+        if (!descrBody) return;
+        if (descrBody.getAttribute('data-cast-done') === '1') return;
+        descrBody.setAttribute('data-cast-done', '1');
+
+        var movie = getMovie();
+        if (!movie || !movie.id) return;
+
+        var mediaType = getMediaType();
+        var apiKey = '4ef0d7355d9ffb5151e987764708ce96';
+        try {
+            if (window.Lampa && Lampa.TMDB && Lampa.TMDB.key) apiKey = Lampa.TMDB.key();
+        } catch (e) {}
+
+        var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/credits?api_key=' + apiKey;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.timeout = 8000;
+        xhr.onload = function () {
+            try {
+                var data = JSON.parse(xhr.responseText);
+                var cast = data.cast;
+                if (!cast || !cast.length) return;
+
+                // Берём первых 3 с фото
+                var top = [];
+                for (var i = 0; i < cast.length && top.length < 3; i++) {
+                    if (cast[i].profile_path) top.push(cast[i]);
+                }
+                if (!top.length) return;
+
+                // Получаем proxy prefix
+                var posterImg = document.querySelector('.full-start-new .full--poster');
+                var prefix = 'https://image.tmdb.org';
+                var query = '';
+                if (posterImg) {
+                    var src = posterImg.getAttribute('src') || posterImg.src || '';
+                    var tpIdx = src.indexOf('/t/p/');
+                    if (tpIdx !== -1) {
+                        prefix = src.substring(0, tpIdx);
+                        var qStart = src.indexOf('?');
+                        if (qStart !== -1) query = src.substring(qStart);
+                    }
+                }
+
+                // Оборачиваем описание в flex-строку
+                var parent = descrBody.parentNode;
+                if (!parent) return;
+
+                var row = document.createElement('div');
+                row.className = 'wide-descr-row';
+                parent.insertBefore(row, descrBody);
+                row.appendChild(descrBody);
+
+                // Создаём блок актёров
+                var castDiv = document.createElement('div');
+                castDiv.className = 'wide-cast';
+
+                for (var j = 0; j < top.length; j++) {
+                    var person = top[j];
+                    var card = document.createElement('div');
+                    card.className = 'wide-cast__person';
+
+                    var photo = document.createElement('img');
+                    photo.className = 'wide-cast__photo';
+                    photo.src = prefix + '/t/p/w185' + person.profile_path + query;
+                    photo.alt = person.name;
+
+                    var name = document.createElement('div');
+                    name.className = 'wide-cast__name';
+                    name.textContent = person.name;
+
+                    card.appendChild(photo);
+                    card.appendChild(name);
+                    castDiv.appendChild(card);
+                }
+
+                row.appendChild(castDiv);
+            } catch (e) {}
+        };
+        xhr.onerror = xhr.ontimeout = function () {};
+        xhr.send();
+    }
+
+    // ==========================================
+    //  10. Заменить заголовок на логотип
     // ==========================================
     function fetchAndSetLogo() {
         var titleEl = document.querySelector('.full-start-new__title');
@@ -500,6 +630,7 @@
             mergeRatings();
             hideDetailTitle();
             fetchAndSetLogo();
+            fetchAndShowCast();
             return;
         }
         setTimeout(function () { trySwap(attemptsLeft - 1); }, 150);
