@@ -505,9 +505,14 @@
             if (cs.display !== 'none') visible.push(children[v]);
         }
         for (var d = 1; d < visible.length; d++) {
+            // Пропускаем точку сразу после рейтинга (перед возрастом)
+            if (visible[d - 1].classList && visible[d - 1].classList.contains('wide-avg-rate')) {
+                visible[d].style.marginLeft = '0.4em';
+                continue;
+            }
             var dot = document.createElement('span');
             dot.textContent = '·';
-            dot.style.cssText = 'margin:0 0.1em; color:rgba(255,255,255,0.3); font-size:0.8em;';
+            dot.style.cssText = 'margin:0 0.25em; color:rgba(255,255,255,0.3); font-size:0.8em;';
             visible[d].parentNode.insertBefore(dot, visible[d]);
         }
     }
