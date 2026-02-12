@@ -85,9 +85,12 @@
         '  -webkit-box-orient: unset !important;',
         '  font-size: 0 !important;',
         '}',
+        '.full-start-new__title.has-logo {',
+        '  margin-bottom: 1rem !important;',
+        '}',
         '.full-start-new__title .wide-logo {',
-        '  max-width: 23.4rem !important;',
-        '  max-height: 7.8rem !important;',
+        '  max-width: 35rem !important;',
+        '  max-height: 12rem !important;',
         '  width: auto !important;',
         '  height: auto !important;',
         '  object-fit: contain !important;',
@@ -124,20 +127,22 @@
         '  display: none !important;',
         '}',
 
-        // --- Плашки (TV, качество и др.) на постере ---
-        '.full-start-new__poster .card__type {',
-        '  position: absolute !important;',
-        '  top: 1.2em !important;',
-        '  left: 1.2em !important;',
-        '  right: auto !important;',
-        '  bottom: auto !important;',
-        '  padding: 0.5em 0.7em !important;',
-        '  font-size: 1.1em !important;',
+        // --- Head: строка с плашкой TV и датой/страной ---
+        '.full-start-new__head {',
+        '  display: flex !important;',
+        '  align-items: center !important;',
+        '  gap: 0.6em !important;',
+        '  margin-bottom: 0.5em !important;',
+        '}',
+        '.full-start-new__head .card__type {',
+        '  position: static !important;',
+        '  padding: 0.35em 0.55em !important;',
+        '  font-size: 1em !important;',
         '  font-weight: 700 !important;',
         '  line-height: 1 !important;',
-        '  border-radius: 0.6em !important;',
-        '  z-index: 3 !important;',
+        '  border-radius: 0.4em !important;',
         '  letter-spacing: 0.05em !important;',
+        '  flex-shrink: 0 !important;',
         '}'
     ].join('\n');
     document.head.appendChild(style);
@@ -218,7 +223,24 @@
     }
 
     // ==========================================
-    //  5. Определить тип медиа (movie / tv)
+    //  5. Переместить плашку TV в строку head
+    // ==========================================
+    function moveBadgeToHead() {
+        var poster = document.querySelector('.full-start-new__poster');
+        var head = document.querySelector('.full-start-new__head');
+        if (!poster || !head) return false;
+        if (head.getAttribute('data-badge-moved') === '1') return true;
+
+        var badge = poster.querySelector('.card__type');
+        if (badge) {
+            head.insertBefore(badge, head.firstChild);
+            head.setAttribute('data-badge-moved', '1');
+        }
+        return true;
+    }
+
+    // ==========================================
+    //  6. Определить тип медиа
     // ==========================================
     function getMediaType() {
         try {
@@ -234,7 +256,7 @@
     }
 
     // ==========================================
-    //  6. Заменить заголовок на логотип
+    //  7. Заменить заголовок на логотип
     // ==========================================
     function fetchAndSetLogo() {
         var titleEl = document.querySelector('.full-start-new__title');
@@ -341,13 +363,14 @@
     }
 
     // ==========================================
-    //  7. Retry
+    //  8. Retry
     // ==========================================
     function trySwap(attemptsLeft) {
         if (attemptsLeft <= 0) return;
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) {
+            moveBadgeToHead();
             fetchAndSetLogo();
             return;
         }
@@ -355,7 +378,7 @@
     }
 
     // ==========================================
-    //  8. Listeners
+    //  9. Listeners
     // ==========================================
     function initListeners() {
         Lampa.Listener.follow('full', function (e) {
@@ -368,7 +391,7 @@
     }
 
     // ==========================================
-    //  9. Start
+    //  10. Start
     // ==========================================
     function start() {
         initListeners();
