@@ -101,10 +101,6 @@
         '.full-start-new__tagline {',
         '  font-size: 1.2em !important;',
         '}',
-        // --- Скрыть заголовок "Подробно" ---
-        '.full-start-new + .items-line > .items-line__title {',
-        '  display: none !important;',
-        '}',
         '.full-start-new__description {',
         '  width: 100% !important;',
         '}',
@@ -286,7 +282,21 @@
     }
 
     // ==========================================
-    //  6. Убрать жанры из строки деталей
+    //  6. Скрыть заголовок "Подробно"
+    // ==========================================
+    function hideDetailTitle() {
+        var titles = document.querySelectorAll('.items-line__title');
+        for (var i = 0; i < titles.length; i++) {
+            var text = titles[i].textContent.trim();
+            if (text === 'Подробно' || text === 'Details') {
+                titles[i].style.display = 'none';
+                break;
+            }
+        }
+    }
+
+    // ==========================================
+    //  7. Убрать жанры из строки деталей
     // ==========================================
     function removeGenresFromDetails() {
         var details = document.querySelector('.full-start-new__details');
@@ -488,6 +498,7 @@
             moveHeadToPoster();
             removeGenresFromDetails();
             mergeRatings();
+            hideDetailTitle();
             fetchAndSetLogo();
             return;
         }
