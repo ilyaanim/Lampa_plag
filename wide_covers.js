@@ -76,6 +76,25 @@
         '  line-clamp: 2 !important;',
         '  text-shadow: none !important;',
         '}',
+        // --- Логотип вместо текста ---
+        '.full-start-new__title.has-logo {',
+        '  display: block !important;',
+        '  -webkit-line-clamp: unset !important;',
+        '  line-clamp: unset !important;',
+        '  overflow: visible !important;',
+        '  -webkit-box-orient: unset !important;',
+        '  font-size: 0 !important;',
+        '}',
+        '.full-start-new__title .wide-logo {',
+        '  max-width: 18em !important;',
+        '  max-height: 6em !important;',
+        '  width: auto !important;',
+        '  height: auto !important;',
+        '  object-fit: contain !important;',
+        '  object-position: left center !important;',
+        '  display: block !important;',
+        '  filter: drop-shadow(0 0.1em 0.3em rgba(0,0,0,0.5)) !important;',
+        '}',
         '.full-start-new__description {',
         '  width: 100% !important;',
         '}',
@@ -199,18 +218,123 @@
     }
 
     // ==========================================
-    //  5. Retry
+    //  5. Определить тип медиа (movie / tv)
+    // ==========================================
+    function getMediaType() {
+        try {
+            var act = Lampa.Activity.active();
+            if (act && act.method) return act.method;
+            var movie = getMovie();
+            if (movie) {
+                if (movie.media_type) return movie.media_type;
+                if (movie.first_air_date || movie.name) return 'tv';
+            }
+        } catch (e) {}
+        return 'movie';
+    }
+
+    // ==========================================
+    //  6. Заменить заголовок на логотип
+    // ==========================================
+    function fetchAndSetLogo() {
+        var titleEl = document.querySelector('.full-start-new__title');
+        if (!titleEl) return;
+        if (titleEl.getAttribute('data-logo-done') === '1') return;
+        titleEl.setAttribute('data-logo-done', '1');
+
+        var movie = getMovie();
+        if (!movie || !movie.id) return;
+
+        var mediaType = getMediaType();
+
+        var apiKey = '4ef0d7355d9ffb5151e987764708ce96';
+        try {
+            if (window.Lampa && Lampa.TMDB && Lampa.TMDB.key) apiKey = Lampa.TMDB.key();
+        } catch (e) {}
+
+        var lang = 'ru';
+        try {
+            if (window.Lampa && Lampa.Storage && Lampa.Storage.field) {
+                lang = Lampa.Storage.field('tmdb_lang') || 'ru';
+            }
+        } catch (e) {}
+
+        var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/images?api_key=' + apiKey + '&include_image_language=' + lang + ',en,null';
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.timeout = 8000;
+        xhr.onload = function () {
+            try {
+                var data = JSON.parse(xhr.responseText);
+                if (!data.logos || !data.logos.length) return;
+
+                // Выбираем лого: предпочитаем язык пользователя, затем en, затем null
+                var logos = data.logos;
+                var best = null;
+                for (var i = 0; i < logos.length; i++) {
+                    var l = logos[i];
+                    if (l.iso_639_1 === lang) { best = l; break; }
+                }
+                if (!best) {
+                    for (var j = 0; j < logos.length; j++) {
+                        if (logos[j].iso_639_1 === 'en') { best = logos[j]; break; }
+                    }
+                }
+                if (!best) best = logos[0];
+
+                // Получаем proxy prefix из текущего постера
+                var posterImg = document.querySelector('.full-start-new .full--poster');
+                var logoSrc;
+                if (posterImg) {
+                    var src = posterImg.getAttribute('src') || posterImg.src || '';
+                    var tpIdx = src.indexOf('/t/p/');
+                    if (tpIdx !== -1) {
+                        var prefix = src.substring(0, tpIdx);
+                        var qStart = src.indexOf('?');
+                        var query = qStart !== -1 ? src.substring(qStart) : '';
+                        logoSrc = prefix + '/t/p/w500' + best.file_path + query;
+                    }
+                }
+                if (!logoSrc) {
+                    logoSrc = 'https://image.tmdb.org/t/p/w500' + best.file_path;
+                }
+
+                // Проверяем, что titleEl ещё на месте
+                titleEl = document.querySelector('.full-start-new__title');
+                if (!titleEl) return;
+
+                var img = new Image();
+                img.className = 'wide-logo';
+                img.alt = movie.title || movie.name || '';
+                img.onload = function () {
+                    titleEl.textContent = '';
+                    titleEl.appendChild(img);
+                    titleEl.classList.add('has-logo');
+                };
+                img.src = logoSrc;
+            } catch (e) {}
+        };
+        xhr.onerror = xhr.ontimeout = function () {};
+        xhr.send();
+    }
+
+    // ==========================================
+    //  7. Retry
     // ==========================================
     function trySwap(attemptsLeft) {
         if (attemptsLeft <= 0) return;
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
-        if (posterDone && btnDone) return;
+        if (posterDone && btnDone) {
+            fetchAndSetLogo();
+            return;
+        }
         setTimeout(function () { trySwap(attemptsLeft - 1); }, 150);
     }
 
     // ==========================================
-    //  6. Listeners
+    //  8. Listeners
     // ==========================================
     function initListeners() {
         Lampa.Listener.follow('full', function (e) {
@@ -223,7 +347,7 @@
     }
 
     // ==========================================
-    //  7. Start
+    //  9. Start
     // ==========================================
     function start() {
         initListeners();
