@@ -417,12 +417,19 @@
         var details = document.querySelector('.full-start-new__details');
         if (details) {
             var spans = details.querySelectorAll('span');
+            var addedCount = 0;
             for (var m = 0; m < spans.length; m++) {
                 var text = spans[m].textContent.trim();
                 if (!text) continue;
+                // Точка-разделитель перед каждым элементом
+                var dot = document.createElement('span');
+                dot.textContent = ' · ';
+                dot.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.35);';
+                rateLine.appendChild(dot);
                 var clone = spans[m].cloneNode(true);
-                clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6); margin-left:0.6em;';
+                clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
                 rateLine.appendChild(clone);
+                addedCount++;
             }
             details.style.display = 'none';
         }
