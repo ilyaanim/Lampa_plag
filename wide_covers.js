@@ -163,10 +163,15 @@
         '}',
         // --- Инфо о следующей серии (перенесено выше рейтинга) ---
         '.wide-next-info {',
+        '  display: block !important;',
         '  color: #fff !important;',
         '  opacity: 1 !important;',
         '  font-size: 0.85em !important;',
         '  margin-bottom: 0.5em !important;',
+        '}',
+        '.wide-next-info, .wide-next-info * {',
+        '  color: #fff !important;',
+        '  opacity: 1 !important;',
         '}',
 
         // --- Blur на фоновый backdrop ---
@@ -435,14 +440,35 @@
         if (right.getAttribute('data-next-moved') === '1') return;
         right.setAttribute('data-next-moved', '1');
 
+        // Классы стандартных элементов — пропускаем
+        var skip = [
+            'full-start-new__title', 'full-start-new__tagline',
+            'full-start-new__head', 'full-start-new__rate-line',
+            'full-start-new__details', 'full-start-new__buttons',
+            'full-start-new__reactions'
+        ];
+
+        var keywords = ['Следующая', 'Осталось', 'серия', 'серий', 'Next', 'episode', 'Remaining'];
         var children = right.children;
         var toMove = [];
 
         for (var i = 0; i < children.length; i++) {
-            var text = children[i].textContent || '';
-            if (text.indexOf('Следующая') !== -1 || text.indexOf('Осталось') !== -1 ||
-                text.indexOf('Next') !== -1 || text.indexOf('Remaining') !== -1) {
-                toMove.push(children[i]);
+            var el = children[i];
+
+            // Пропускаем известные блоки
+            var isKnown = false;
+            for (var k = 0; k < skip.length; k++) {
+                if (el.classList.contains(skip[k])) { isKnown = true; break; }
+            }
+            if (isKnown) continue;
+
+            // Проверяем текст на ключевые слова
+            var text = el.textContent || '';
+            for (var m = 0; m < keywords.length; m++) {
+                if (text.indexOf(keywords[m]) !== -1) {
+                    toMove.push(el);
+                    break;
+                }
             }
         }
 
