@@ -167,9 +167,9 @@
         '.wide-avg-rate {',
         '  display: inline-flex !important;',
         '  align-items: center !important;',
-        '  background: rgba(255,255,255,0.15) !important;',
-        '  border-radius: 0.8em !important;',
-        '  padding: 0.5em 0.7em !important;',
+        '  background: none !important;',
+        '  border-radius: 0 !important;',
+        '  padding: 0 !important;',
         '  font-size: 1.3em !important;',
         '  font-weight: 700 !important;',
         '  color: #fff !important;',
@@ -518,7 +518,7 @@
         for (var d = 1; d < visible.length; d++) {
             var dot = document.createElement('span');
             dot.textContent = '·';
-            dot.style.cssText = 'margin:0 0.4em; color:rgba(255,255,255,0.3); font-size:1em;';
+            dot.style.cssText = 'margin:0 0.1em; color:rgba(255,255,255,0.3); font-size:0.8em;';
             visible[d].parentNode.insertBefore(dot, visible[d]);
         }
     }
