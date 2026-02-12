@@ -72,6 +72,12 @@ Plugin changes to cinematic vertical layout:
    - Calculates average from TMDB/IMDB/KP ratings
    - Creates `.wide-avg-rate` badge with rounded SVG star
    - Merges seasons/episodes info into rating line
+   - Adds quality badges (4K/1080p/Low) and duration
+
+6a. **Next Episode Info** — `moveNextEpisodeInfo()`:
+   - Extracts "Следующая серия" / "Осталось дней" from rate-line
+   - Creates `.wide-next-info` block above rate-line
+   - `retryNextEpisode()` re-checks at 1s, 3s, 5s for async-loaded data
 
 7. **Logo Display** — `fetchAndSetLogo()`:
    - Fetches logos from TMDB `/images` endpoint (English priority)

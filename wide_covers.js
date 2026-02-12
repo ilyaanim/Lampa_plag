@@ -210,15 +210,7 @@
         '  margin-top: 0.8em !important;',
         '}',
         '.full-start-new__buttons .full-start__button {',
-        '  backdrop-filter: blur(20px) !important;',
-        '  -webkit-backdrop-filter: blur(20px) !important;',
-        '  background: rgba(255,255,255,0.12) !important;',
         '  border-radius: 1em !important;',
-        '}',
-        '.full-start-new__buttons .button--play {',
-        '  backdrop-filter: blur(20px) !important;',
-        '  -webkit-backdrop-filter: blur(20px) !important;',
-        '  background: rgba(255,255,255,0.9) !important;',
         '}',
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
@@ -818,7 +810,52 @@
     }
 
     // ==========================================
-    //  8. Retry
+    //  8a. Повторная попытка вынести «Следующая серия»
+    // ==========================================
+    function retryNextEpisode() {
+        var rateLine = document.querySelector('.full-start-new__rate-line');
+        if (!rateLine) return;
+
+        // Если уже есть блок wide-next-info с контентом — не трогаем
+        var existing = document.querySelector('.wide-next-info');
+        if (existing && existing.children.length > 0) return;
+
+        // Ищем ключевые слова среди прямых детей rate-line
+        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining'];
+        var found = false;
+        var els = rateLine.querySelectorAll('*');
+        for (var i = 0; i < els.length; i++) {
+            var text = els[i].textContent || '';
+            for (var k = 0; k < keywords.length; k++) {
+                if (text.indexOf(keywords[k]) !== -1) { found = true; break; }
+            }
+            if (found) break;
+        }
+
+        // Также проверяем детей .full-start-new__right
+        if (!found) {
+            var right = document.querySelector('.full-start-new__right');
+            if (right) {
+                var children = right.children;
+                for (var c = 0; c < children.length; c++) {
+                    var chText = children[c].textContent || '';
+                    for (var kk = 0; kk < keywords.length; kk++) {
+                        if (chText.indexOf(keywords[kk]) !== -1) { found = true; break; }
+                    }
+                    if (found) break;
+                }
+            }
+        }
+
+        if (found) {
+            // Сбрасываем флаг и повторно вызываем
+            rateLine.removeAttribute('data-next-extracted');
+            moveNextEpisodeInfo();
+        }
+    }
+
+    // ==========================================
+    //  8b. Retry
     // ==========================================
     function trySwap(attemptsLeft) {
         if (attemptsLeft <= 0) return;
@@ -832,6 +869,10 @@
             hideDetailTitle();
             fetchAndSetLogo();
             fetchAndShowCast();
+            // Повторно пробуем вынести след. серию (может загрузиться позже)
+            setTimeout(function () { retryNextEpisode(); }, 1000);
+            setTimeout(function () { retryNextEpisode(); }, 3000);
+            setTimeout(function () { retryNextEpisode(); }, 5000);
             return;
         }
         setTimeout(function () { trySwap(attemptsLeft - 1); }, 150);
