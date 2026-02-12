@@ -98,6 +98,9 @@
         '  display: block !important;',
         '  filter: drop-shadow(0 0.1rem 0.3rem rgba(0,0,0,0.5)) !important;',
         '}',
+        '.full-start-new__tagline {',
+        '  font-size: 1.2em !important;',
+        '}',
         '.full-start-new__description {',
         '  width: 100% !important;',
         '}',
@@ -127,22 +130,31 @@
         '  display: none !important;',
         '}',
 
-        // --- Head: строка с плашкой TV и датой/страной ---
-        '.full-start-new__head {',
+        // --- Плашка TV + год/страна на постере ---
+        '.wide-poster-info {',
+        '  position: absolute !important;',
+        '  top: 1.2em !important;',
+        '  left: 1.2em !important;',
+        '  z-index: 3 !important;',
         '  display: flex !important;',
         '  align-items: center !important;',
-        '  gap: 0.6em !important;',
-        '  margin-bottom: 0.5em !important;',
+        '  gap: 0.5em !important;',
         '}',
-        '.full-start-new__head .card__type {',
+        '.wide-poster-info .card__type {',
         '  position: static !important;',
-        '  padding: 0.35em 0.55em !important;',
-        '  font-size: 1em !important;',
+        '  padding: 0.4em 0.6em !important;',
+        '  font-size: 1.1em !important;',
         '  font-weight: 700 !important;',
         '  line-height: 1 !important;',
-        '  border-radius: 0.4em !important;',
+        '  border-radius: 0.5em !important;',
         '  letter-spacing: 0.05em !important;',
         '  flex-shrink: 0 !important;',
+        '}',
+        '.wide-poster-info .wide-head-text {',
+        '  color: rgba(255,255,255,0.9) !important;',
+        '  font-size: 1.1em !important;',
+        '  text-shadow: 0 1px 3px rgba(0,0,0,0.7) !important;',
+        '  white-space: nowrap !important;',
         '}'
     ].join('\n');
     document.head.appendChild(style);
@@ -223,24 +235,62 @@
     }
 
     // ==========================================
-    //  5. Переместить плашку TV в строку head
+    //  5. Переместить год/страну на постер рядом с TV badge
     // ==========================================
-    function moveBadgeToHead() {
+    function moveHeadToPoster() {
         var poster = document.querySelector('.full-start-new__poster');
         var head = document.querySelector('.full-start-new__head');
-        if (!poster || !head) return false;
-        if (head.getAttribute('data-badge-moved') === '1') return true;
+        if (!poster || !head) return;
+        if (poster.querySelector('.wide-poster-info')) return;
 
+        var wrap = document.createElement('div');
+        wrap.className = 'wide-poster-info';
+
+        // Переносим badge (TV) если есть
         var badge = poster.querySelector('.card__type');
-        if (badge) {
-            head.insertBefore(badge, head.firstChild);
-            head.setAttribute('data-badge-moved', '1');
+        if (badge) wrap.appendChild(badge);
+
+        // Копируем текст из head (год, страна)
+        var headText = head.textContent.trim();
+        if (headText) {
+            var span = document.createElement('span');
+            span.className = 'wide-head-text';
+            span.textContent = headText;
+            wrap.appendChild(span);
         }
-        return true;
+
+        poster.appendChild(wrap);
+
+        // Скрываем оригинальный head
+        head.style.display = 'none';
     }
 
     // ==========================================
-    //  6. Определить тип медиа
+    //  6. Убрать жанры из строки деталей
+    // ==========================================
+    function removeGenresFromDetails() {
+        var details = document.querySelector('.full-start-new__details');
+        if (!details) return;
+        if (details.getAttribute('data-genres-removed') === '1') return;
+        details.setAttribute('data-genres-removed', '1');
+
+        // Жанры — span содержащий "|" (разделитель жанров), без ":" (как в "Сезоны: 1")
+        var spans = details.querySelectorAll('span');
+        for (var i = 0; i < spans.length; i++) {
+            var text = spans[i].textContent;
+            if (text.indexOf('|') !== -1 && text.indexOf(':') === -1) {
+                // Удаляем span жанров и предшествующий разделитель ●
+                var prev = spans[i].previousSibling;
+                if (prev && prev.nodeType === 3 && prev.textContent.indexOf('●') !== -1) {
+                    prev.remove();
+                }
+                spans[i].remove();
+            }
+        }
+    }
+
+    // ==========================================
+    //  7. Определить тип медиа
     // ==========================================
     function getMediaType() {
         try {
@@ -342,12 +392,6 @@
                     titleEl.textContent = '';
                     titleEl.appendChild(img);
                     titleEl.classList.add('has-logo');
-
-                    // Переместить заголовок (лого) выше блока с датой/страной
-                    var head = titleEl.parentNode.querySelector('.full-start-new__head');
-                    if (head && titleEl.parentNode) {
-                        titleEl.parentNode.insertBefore(titleEl, head);
-                    }
                 };
                 img.onerror = function () {
                     console.log('[Wide Covers] fetchLogo: image load FAILED');
@@ -370,7 +414,8 @@
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) {
-            moveBadgeToHead();
+            moveHeadToPoster();
+            removeGenresFromDetails();
             fetchAndSetLogo();
             return;
         }
