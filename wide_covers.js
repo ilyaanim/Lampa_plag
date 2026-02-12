@@ -60,7 +60,7 @@
         '.full-start-new__right {',
         '  position: relative !important;',
         '  z-index: 2 !important;',
-        '  margin-top: -18em !important;',
+        '  margin-top: -14em !important;',
         '  padding-left: 1.5em !important;',
         '  padding-right: 1.5em !important;',
         '}',
@@ -181,6 +181,9 @@
         '}',
 
         // --- Кнопки ---
+        '.full-start-new__buttons {',
+        '  margin-top: 0.3em !important;',
+        '}',
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
         '}',
@@ -414,19 +417,22 @@
         if (details) {
             var spans = details.querySelectorAll('span');
             for (var m = 0; m < spans.length; m++) {
+                var text = spans[m].textContent.trim();
+                if (!text) continue;
                 var clone = spans[m].cloneNode(true);
-                clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6); margin-left:0.4em;';
+                clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6); margin-left:0.6em;';
                 rateLine.appendChild(clone);
             }
             details.style.display = 'none';
         }
 
-        // Убираем разделители ● из rate-line
+        // Убираем все разделители ● и лишние пробелы из rate-line
         var walker = document.createTreeWalker(rateLine, NodeFilter.SHOW_TEXT, null, false);
         var textNodes = [];
         while (walker.nextNode()) textNodes.push(walker.currentNode);
         for (var n = 0; n < textNodes.length; n++) {
-            textNodes[n].textContent = textNodes[n].textContent.replace(/\s*●\s*/g, '');
+            var cleaned = textNodes[n].textContent.replace(/\s*●\s*/g, '').replace(/^\s+$/, '');
+            textNodes[n].textContent = cleaned;
         }
     }
 
@@ -509,6 +515,13 @@
             var next = extracted[j].nextSibling;
             if (next && next.nodeType === 3 && next.textContent.indexOf('●') !== -1) {
                 next.remove();
+            }
+            // Точка-разделитель между элементами
+            if (j > 0) {
+                var dot = document.createElement('span');
+                dot.textContent = ' · ';
+                dot.style.cssText = 'opacity:0.5;';
+                infoBlock.appendChild(dot);
             }
             infoBlock.appendChild(extracted[j]);
         }
