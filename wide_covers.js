@@ -183,7 +183,7 @@
 
         // --- Кнопки ---
         '.full-start-new__buttons {',
-        '  margin-top: 0 !important;',
+        '  margin-top: 0.1em !important;',
         '}',
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
@@ -417,30 +417,44 @@
         var details = document.querySelector('.full-start-new__details');
         if (details) {
             var spans = details.querySelectorAll('span');
-            var addedCount = 0;
             for (var m = 0; m < spans.length; m++) {
                 var text = spans[m].textContent.trim();
                 if (!text) continue;
-                // Точка-разделитель перед каждым элементом
-                var dot = document.createElement('span');
-                dot.textContent = ' · ';
-                dot.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.35);';
-                rateLine.appendChild(dot);
                 var clone = spans[m].cloneNode(true);
                 clone.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.6);';
+                clone.setAttribute('data-wide-detail', '1');
                 rateLine.appendChild(clone);
-                addedCount++;
             }
             details.style.display = 'none';
         }
 
-        // Убираем все разделители ● и лишние пробелы из rate-line
+        // Убираем ВСЕ текстовые ноды (●, пробелы, и т.д.) из rate-line
         var walker = document.createTreeWalker(rateLine, NodeFilter.SHOW_TEXT, null, false);
         var textNodes = [];
-        while (walker.nextNode()) textNodes.push(walker.currentNode);
+        while (walker.nextNode()) {
+            // Только прямые текстовые ноды rate-line (не внутри дочерних элементов)
+            if (walker.currentNode.parentNode === rateLine) {
+                textNodes.push(walker.currentNode);
+            }
+        }
         for (var n = 0; n < textNodes.length; n++) {
-            var cleaned = textNodes[n].textContent.replace(/\s*●\s*/g, '').replace(/^\s+$/, '');
-            textNodes[n].textContent = cleaned;
+            textNodes[n].remove();
+        }
+
+        // Расставляем точки-разделители только между ВИДИМЫМИ элементами
+        var children = rateLine.children;
+        var visible = [];
+        for (var v = 0; v < children.length; v++) {
+            var style = window.getComputedStyle(children[v]);
+            if (style.display !== 'none') visible.push(children[v]);
+        }
+        // Вставляем точки между видимыми (после первого)
+        for (var d = 1; d < visible.length; d++) {
+            var dot = document.createElement('span');
+            dot.className = 'wide-dot-sep';
+            dot.textContent = ' · ';
+            dot.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.35);';
+            visible[d].parentNode.insertBefore(dot, visible[d]);
         }
     }
 
