@@ -86,8 +86,8 @@
         '  font-size: 0 !important;',
         '}',
         '.full-start-new__title .wide-logo {',
-        '  max-width: 18rem !important;',
-        '  max-height: 6rem !important;',
+        '  max-width: 23.4rem !important;',
+        '  max-height: 7.8rem !important;',
         '  width: auto !important;',
         '  height: auto !important;',
         '  object-fit: contain !important;',
@@ -320,6 +320,12 @@
                     titleEl.textContent = '';
                     titleEl.appendChild(img);
                     titleEl.classList.add('has-logo');
+
+                    // Переместить заголовок (лого) выше блока с датой/страной
+                    var head = titleEl.parentNode.querySelector('.full-start-new__head');
+                    if (head && titleEl.parentNode) {
+                        titleEl.parentNode.insertBefore(titleEl, head);
+                    }
                 };
                 img.onerror = function () {
                     console.log('[Wide Covers] fetchLogo: image load FAILED');
