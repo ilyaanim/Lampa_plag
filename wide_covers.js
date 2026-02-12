@@ -65,12 +65,6 @@
         '  padding-right: 1.5em !important;',
         '}',
 
-        // --- Убрать маску скролла на странице фильма ---
-        '.scroll--mask:has(.full-start-new) {',
-        '  -webkit-mask-image: none !important;',
-        '  mask-image: none !important;',
-        '}',
-
         // --- Выровнять секции ниже постера ---
         '.full-start-new ~ div,',
         '.full-start-new ~ section {',
@@ -116,8 +110,6 @@
         '  display: flex !important;',
         '  align-items: flex-start !important;',
         '  gap: 2em !important;',
-        '  padding-left: 1.5em !important;',
-        '  padding-right: 1.5em !important;',
         '}',
         '.wide-descr-row .full-descr {',
         '  flex: 1 !important;',
@@ -225,7 +217,20 @@
     document.head.appendChild(style);
 
     // ==========================================
-    //  2. Получить данные фильма из Activity
+    //  2. Убрать маску скролла
+    // ==========================================
+    function removeScrollMask() {
+        var el = document.querySelector('.full-start-new');
+        if (!el) return;
+        var parent = el.closest('.scroll--mask');
+        if (parent) {
+            parent.style.webkitMaskImage = 'none';
+            parent.style.maskImage = 'none';
+        }
+    }
+
+    // ==========================================
+    //  3. Получить данные фильма из Activity
     // ==========================================
     function getMovie() {
         try {
@@ -633,6 +638,7 @@
         var posterDone = swapPoster();
         var btnDone = moveButtonsBlock();
         if (posterDone && btnDone) {
+            removeScrollMask();
             moveHeadToPoster();
             removeGenresFromDetails();
             mergeRatings();
