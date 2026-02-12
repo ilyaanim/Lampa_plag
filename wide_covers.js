@@ -120,6 +120,7 @@
         '  display: flex !important;',
         '  gap: 1.2em !important;',
         '  flex-shrink: 0 !important;',
+        '  padding-right: 1.5em !important;',
         '}',
         '.wide-cast__person {',
         '  display: flex !important;',
@@ -220,12 +221,34 @@
     //  2. Убрать маску скролла
     // ==========================================
     function removeScrollMask() {
+        // Ищем через closest
         var el = document.querySelector('.full-start-new');
-        if (!el) return;
-        var parent = el.closest('.scroll--mask');
-        if (parent) {
-            parent.style.webkitMaskImage = 'none';
-            parent.style.maskImage = 'none';
+        if (el) {
+            var parent = el.closest('.scroll--mask');
+            if (parent) {
+                parent.style.webkitMaskImage = 'none';
+                parent.style.maskImage = 'none';
+            }
+        }
+        // Ищем все scroll--mask на странице как fallback
+        var masks = document.querySelectorAll('.scroll--mask');
+        for (var i = 0; i < masks.length; i++) {
+            if (masks[i].querySelector('.full-start-new')) {
+                masks[i].style.webkitMaskImage = 'none';
+                masks[i].style.maskImage = 'none';
+            }
+        }
+        // Проверяем также scroll__body и scroll__content
+        if (el) {
+            var node = el.parentNode;
+            while (node && node !== document.body) {
+                var cs = window.getComputedStyle(node);
+                if (cs.maskImage && cs.maskImage !== 'none') {
+                    node.style.webkitMaskImage = 'none';
+                    node.style.maskImage = 'none';
+                }
+                node = node.parentNode;
+            }
         }
     }
 
