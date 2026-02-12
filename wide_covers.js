@@ -141,7 +141,7 @@
         '}',
         '.full-start-new__rate-line {',
         '  text-shadow: none !important;',
-        '  margin-bottom: 0.3em !important;',
+        '  margin-bottom: 0.6em !important;',
         '}',
         '.wide-avg-rate {',
         '  display: inline-flex !important;',
@@ -168,7 +168,7 @@
         '  color: #fff !important;',
         '  opacity: 1 !important;',
         '  font-size: 0.85em !important;',
-        '  margin-bottom: 0.5em !important;',
+        '  margin-bottom: 0.8em !important;',
         '}',
         '.wide-next-info, .wide-next-info * {',
         '  color: #fff !important;',
@@ -183,7 +183,7 @@
 
         // --- Кнопки ---
         '.full-start-new__buttons {',
-        '  margin-top: 0.1em !important;',
+        '  margin-top: 0.4em !important;',
         '}',
         '.full-start-new__buttons .button--play span {',
         '  display: inline !important;',
@@ -441,20 +441,15 @@
             textNodes[n].remove();
         }
 
-        // Расставляем точки-разделители только между ВИДИМЫМИ элементами
+        // Добавляем один пробел между ВИДИМЫМИ элементами
         var children = rateLine.children;
         var visible = [];
         for (var v = 0; v < children.length; v++) {
-            var style = window.getComputedStyle(children[v]);
-            if (style.display !== 'none') visible.push(children[v]);
+            var cs = window.getComputedStyle(children[v]);
+            if (cs.display !== 'none') visible.push(children[v]);
         }
-        // Вставляем точки между видимыми (после первого)
         for (var d = 1; d < visible.length; d++) {
-            var dot = document.createElement('span');
-            dot.className = 'wide-dot-sep';
-            dot.textContent = ' · ';
-            dot.style.cssText = 'font-size:1.12em; color:rgba(255,255,255,0.35);';
-            visible[d].parentNode.insertBefore(dot, visible[d]);
+            visible[d].style.marginLeft = '0.5em';
         }
     }
 
@@ -537,13 +532,6 @@
             var next = extracted[j].nextSibling;
             if (next && next.nodeType === 3 && next.textContent.indexOf('●') !== -1) {
                 next.remove();
-            }
-            // Точка-разделитель между элементами
-            if (j > 0) {
-                var dot = document.createElement('span');
-                dot.textContent = ' · ';
-                dot.style.cssText = 'opacity:0.5;';
-                infoBlock.appendChild(dot);
             }
             infoBlock.appendChild(extracted[j]);
         }
