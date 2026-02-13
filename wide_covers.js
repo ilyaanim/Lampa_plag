@@ -23,10 +23,7 @@
         // --- Poster: широкий с fade ---
         '.full-start-new__poster {',
         '  padding-bottom: 50% !important;',
-        '  border-top-left-radius: 2em !important;',
-        '  border-top-right-radius: 2em !important;',
-        '  border-bottom-left-radius: 0 !important;',
-        '  border-bottom-right-radius: 0 !important;',
+        '  border-radius: 2em 2em 0 0 !important;',
         '  overflow: hidden !important;',
         '  position: relative !important;',
         '}',
@@ -48,10 +45,7 @@
         '.full-start-new__poster .full-start-new__img {',
         '  object-fit: cover !important;',
         '  object-position: center 20% !important;',
-        '  border-top-left-radius: 2em !important;',
-        '  border-top-right-radius: 2em !important;',
-        '  border-bottom-left-radius: 0 !important;',
-        '  border-bottom-right-radius: 0 !important;',
+        '  border-radius: 2em 2em 0 0 !important;',
         '  -webkit-mask-image: linear-gradient(to bottom, white 50%, transparent 100%) !important;',
         '  mask-image: linear-gradient(to bottom, white 50%, transparent 100%) !important;',
         '}',
@@ -274,6 +268,35 @@
     }
 
     // ==========================================
+    //  2a. Получить TMDB API key
+    // ==========================================
+    function getApiKey() {
+        try {
+            if (window.Lampa && Lampa.TMDB && Lampa.TMDB.key) return Lampa.TMDB.key();
+        } catch (e) {}
+        return '4ef0d7355d9ffb5151e987764708ce96';
+    }
+
+    // ==========================================
+    //  2b. Получить proxy prefix и query из текущего постера
+    // ==========================================
+    function getProxyInfo() {
+        var posterImg = document.querySelector('.full-start-new .full--poster');
+        var prefix = 'https://image.tmdb.org';
+        var query = '';
+        if (posterImg) {
+            var src = posterImg.getAttribute('src') || posterImg.src || '';
+            var tpIdx = src.indexOf('/t/p/');
+            if (tpIdx !== -1) {
+                prefix = src.substring(0, tpIdx);
+                var qStart = src.indexOf('?');
+                if (qStart !== -1) query = src.substring(qStart);
+            }
+        }
+        return { prefix: prefix, query: query };
+    }
+
+    // ==========================================
     //  3. Подменить постер на backdrop
     // ==========================================
     function swapPoster() {
@@ -405,7 +428,7 @@
     }
 
     // ==========================================
-    //  7. Заменить рейтинги на средний
+    //  8. Заменить рейтинги на средний
     // ==========================================
     function mergeRatings() {
         var rateLine = document.querySelector('.full-start-new__rate-line');
@@ -518,8 +541,7 @@
         var children = rateLine.children;
         var visible = [];
         for (var v = 0; v < children.length; v++) {
-            var cs = window.getComputedStyle(children[v]);
-            if (cs.display !== 'none') visible.push(children[v]);
+            if (children[v].offsetWidth > 0 || children[v].offsetHeight > 0) visible.push(children[v]);
         }
         for (var d = 1; d < visible.length; d++) {
             // Пропускаем точку сразу после рейтинга (перед возрастом)
@@ -534,7 +556,7 @@
     }
 
     // ==========================================
-    //  8. Вынести «Следующая серия» / «Осталось» в отдельный блок выше rate-line
+    //  9. Вынести «Следующая серия» / «Осталось» в отдельный блок выше rate-line
     // ==========================================
     function moveNextEpisodeInfo() {
         var rateLine = document.querySelector('.full-start-new__rate-line');
@@ -542,7 +564,7 @@
         if (rateLine.getAttribute('data-next-extracted') === '1') return;
         rateLine.setAttribute('data-next-extracted', '1');
 
-        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining', 'серия'];
+        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining'];
         var extracted = [];
 
         // Вспомогательная: содержит ли текст одно из ключевых слов
@@ -610,7 +632,7 @@
     }
 
     // ==========================================
-    //  9. Определить тип медиа (movie / tv)
+    //  10. Определить тип медиа (movie / tv)
     // ==========================================
     function getMediaType() {
         try {
@@ -626,7 +648,7 @@
     }
 
     // ==========================================
-    //  9. Загрузить 3 главных актёров рядом с описанием
+    //  11. Загрузить 3 главных актёров рядом с описанием
     // ==========================================
     function fetchAndShowCast() {
         var descrBody = document.querySelector('.full-descr');
@@ -638,12 +660,7 @@
         if (!movie || !movie.id) return;
 
         var mediaType = getMediaType();
-        var apiKey = '4ef0d7355d9ffb5151e987764708ce96';
-        try {
-            if (window.Lampa && Lampa.TMDB && Lampa.TMDB.key) apiKey = Lampa.TMDB.key();
-        } catch (e) {}
-
-        var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/credits?api_key=' + apiKey;
+        var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/credits?api_key=' + getApiKey();
 
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url);
@@ -661,19 +678,9 @@
                 }
                 if (!top.length) return;
 
-                // Получаем proxy prefix
-                var posterImg = document.querySelector('.full-start-new .full--poster');
-                var prefix = 'https://image.tmdb.org';
-                var query = '';
-                if (posterImg) {
-                    var src = posterImg.getAttribute('src') || posterImg.src || '';
-                    var tpIdx = src.indexOf('/t/p/');
-                    if (tpIdx !== -1) {
-                        prefix = src.substring(0, tpIdx);
-                        var qStart = src.indexOf('?');
-                        if (qStart !== -1) query = src.substring(qStart);
-                    }
-                }
+                var proxy = getProxyInfo();
+                var prefix = proxy.prefix;
+                var query = proxy.query;
 
                 // Оборачиваем описание в flex-строку
                 var parent = descrBody.parentNode;
@@ -716,7 +723,7 @@
     }
 
     // ==========================================
-    //  10. Заменить заголовок на логотип
+    //  12. Заменить заголовок на логотип
     // ==========================================
     function fetchAndSetLogo() {
         var posterInfo = document.querySelector('.wide-poster-info');
@@ -732,10 +739,6 @@
         if (!movie || !movie.id) return;
 
         var mediaType = getMediaType();
-        var apiKey = '4ef0d7355d9ffb5151e987764708ce96';
-        try {
-            if (window.Lampa && Lampa.TMDB && Lampa.TMDB.key) apiKey = Lampa.TMDB.key();
-        } catch (e) {}
 
         var lang = 'ru';
         try {
@@ -744,7 +747,7 @@
             }
         } catch (e) {}
 
-        var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/images?api_key=' + apiKey + '&include_image_language=' + lang + ',en,null';
+        var url = 'https://api.themoviedb.org/3/' + mediaType + '/' + movie.id + '/images?api_key=' + getApiKey() + '&include_image_language=' + lang + ',en,null';
 
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url);
@@ -761,22 +764,8 @@
                 }
                 if (!best) best = logos[0];
 
-                // Получаем proxy prefix из текущего постера
-                var posterImg = document.querySelector('.full-start-new .full--poster');
-                var logoSrc;
-                if (posterImg) {
-                    var src = posterImg.getAttribute('src') || posterImg.src || '';
-                    var tpIdx = src.indexOf('/t/p/');
-                    if (tpIdx !== -1) {
-                        var prefix = src.substring(0, tpIdx);
-                        var qStart = src.indexOf('?');
-                        var query = qStart !== -1 ? src.substring(qStart) : '';
-                        logoSrc = prefix + '/t/p/w500' + best.file_path + query;
-                    }
-                }
-                if (!logoSrc) {
-                    logoSrc = 'https://image.tmdb.org/t/p/w500' + best.file_path;
-                }
+                var proxy = getProxyInfo();
+                var logoSrc = proxy.prefix + '/t/p/w500' + best.file_path + proxy.query;
 
                 var img = new Image();
                 img.className = 'wide-poster-logo';
@@ -800,7 +789,7 @@
     }
 
     // ==========================================
-    //  8a. Повторная попытка вынести «Следующая серия»
+    //  9a. Повторная попытка вынести «Следующая серия»
     // ==========================================
     function retryNextEpisode() {
         // Если уже есть блок wide-next-info с контентом — не трогаем
@@ -811,7 +800,7 @@
         if (!rateLine) return;
 
         // Ищем ключевые слова ВЕЗДЕ в .full-start-new__right
-        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining', 'серия'];
+        var keywords = ['Следующая', 'Осталось', 'Next', 'Remaining'];
         var found = false;
         var right = document.querySelector('.full-start-new__right');
         if (right) {
@@ -833,7 +822,7 @@
     }
 
     // ==========================================
-    //  8b. Retry
+    //  13. Retry — основной цикл инициализации
     // ==========================================
     function trySwap(attemptsLeft) {
         if (attemptsLeft <= 0) return;
@@ -848,16 +837,19 @@
             fetchAndSetLogo();
             fetchAndShowCast();
             // Повторно пробуем вынести след. серию (может загрузиться позже)
-            setTimeout(function () { retryNextEpisode(); }, 1000);
-            setTimeout(function () { retryNextEpisode(); }, 3000);
-            setTimeout(function () { retryNextEpisode(); }, 5000);
+            var retryCount = 0;
+            var retryTimer = setInterval(function () {
+                retryCount++;
+                retryNextEpisode();
+                if (retryCount >= 3) clearInterval(retryTimer);
+            }, 2000);
             return;
         }
         setTimeout(function () { trySwap(attemptsLeft - 1); }, 150);
     }
 
     // ==========================================
-    //  9. Listeners
+    //  14. Listeners
     // ==========================================
     function initListeners() {
         Lampa.Listener.follow('full', function (e) {
@@ -870,7 +862,7 @@
     }
 
     // ==========================================
-    //  10. Start
+    //  15. Start
     // ==========================================
     function start() {
         initListeners();
@@ -879,12 +871,10 @@
 
     if (window.appready) {
         start();
-    } else {
+    } else if (window.Lampa && Lampa.Listener) {
         Lampa.Listener.follow('app', function (e) {
             if (e.type === 'ready') start();
         });
     }
-
-    try { if (window.Lampa && Lampa.Listener) start(); } catch (e) {}
 
 })();
