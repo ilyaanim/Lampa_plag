@@ -10,9 +10,6 @@
     //  Всё остальное — скрыто.
     // ==========================================
 
-    // Заголовки секций которые оставляем (частичное совпадение)
-    var KEEP_TITLES = ['Продолжить', 'Позже', 'Continue', 'Watch later'];
-
     // ==========================================
     //  1. Определить, находимся ли мы на Главной
     // ==========================================
@@ -25,14 +22,23 @@
     }
 
     // ==========================================
-    //  2. Проверить, разрешён ли заголовок
+    //  2. Классификация заголовков секций
     // ==========================================
+    function isContinueTitle(text) {
+        return text.indexOf('Продолжить') !== -1 || text.indexOf('Continue') !== -1;
+    }
+
+    function isLaterTitle(text) {
+        return text.indexOf('Позже') !== -1 || text.indexOf('Watch later') !== -1;
+    }
+
     function isTitleAllowed(text) {
-        if (!text) return false;
-        for (var i = 0; i < KEEP_TITLES.length; i++) {
-            if (text.indexOf(KEEP_TITLES[i]) !== -1) return true;
-        }
-        return false;
+        return isContinueTitle(text) || isLaterTitle(text);
+    }
+
+    function getSectionTitle(section) {
+        var el = section.querySelector('.items-line__title');
+        return el ? (el.textContent || el.innerText || '').trim() : '';
     }
 
     // ==========================================
@@ -60,52 +66,86 @@
     }
 
     // ==========================================
-    //  4. Обработать одну секцию (.items-line)
-    //     — скрыть если не в списке разрешённых
+    //  4. Скрыть ненужные + переставить порядок
+    //     Вызывается многократно (retry), поэтому
+    //     каждый раз пересканирует все секции.
     // ==========================================
-    function processSection(section) {
-        if (!section) return;
-        if (section.getAttribute('data-nmm-done') === '1') return;
-        section.setAttribute('data-nmm-done', '1');
-
-        var titleEl = section.querySelector('.items-line__title');
-        var text = titleEl ? (titleEl.textContent || titleEl.innerText || '').trim() : '';
-
-        if (!isTitleAllowed(text)) {
-            section.style.display = 'none';
-        }
-    }
-
-    // ==========================================
-    //  5. Обработать все секции на странице
-    // ==========================================
-    function processAllSections() {
+    function hideAndReorder() {
         if (!isMainPage()) return;
 
         var sections = document.querySelectorAll('.items-line');
+        if (!sections.length) return;
+
+        var continueSection = null;
+        var laterSection = null;
+        var parent = null;
+
         for (var i = 0; i < sections.length; i++) {
-            processSection(sections[i]);
+            var section = sections[i];
+            var text = getSectionTitle(section);
+
+            if (isContinueTitle(text)) {
+                continueSection = section;
+                section.style.display = '';
+                if (!parent) parent = section.parentNode;
+            } else if (isLaterTitle(text)) {
+                laterSection = section;
+                section.style.display = '';
+                if (!parent) parent = section.parentNode;
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        if (!parent) return;
+
+        // --- Переставляем DOM-порядок ---
+        // Сначала ставим «Позже» в начало контейнера,
+        // потом «Продолжить» перед ним.
+        // Итого: Продолжить → Позже → (скрытое)
+        if (laterSection && laterSection.parentNode === parent) {
+            parent.insertBefore(laterSection, parent.firstChild);
+        }
+        if (continueSection && continueSection.parentNode === parent) {
+            parent.insertBefore(continueSection, parent.firstChild);
         }
     }
 
     // ==========================================
-    //  6. Retry-цикл — секции загружаются
-    //     асинхронно, проверяем многократно
+    //  5. Retry-цикл — секции грузятся асинхронно
+    //     «Продолжить просмотр» может появиться
+    //     позже «Позже», поэтому проверяем долго.
     // ==========================================
-    function retryProcess(attemptsLeft) {
-        if (attemptsLeft <= 0) return;
-        if (!isMainPage()) return;
+    var retryTimer = null;
 
-        processAllSections();
+    function startRetry() {
+        stopRetry();
+        var attempts = 0;
+        var maxAttempts = 60; // 60 × 300ms = 18 сек
 
-        setTimeout(function () {
-            retryProcess(attemptsLeft - 1);
-        }, 500);
+        retryTimer = setInterval(function () {
+            attempts++;
+            if (attempts > maxAttempts || !isMainPage()) {
+                stopRetry();
+                return;
+            }
+            hideAndReorder();
+        }, 300);
+
+        // Первый вызов сразу
+        hideAndReorder();
+    }
+
+    function stopRetry() {
+        if (retryTimer) {
+            clearInterval(retryTimer);
+            retryTimer = null;
+        }
     }
 
     // ==========================================
-    //  7. MutationObserver — ловим секции
-    //     которые добавляются позже (подгрузка)
+    //  6. MutationObserver — ловим секции
+    //     которые добавляются при подгрузке
     // ==========================================
     var observer = null;
 
@@ -121,7 +161,7 @@
                 stopObserver();
                 return;
             }
-            processAllSections();
+            hideAndReorder();
         });
 
         observer.observe(target, { childList: true, subtree: true });
@@ -135,38 +175,37 @@
     }
 
     // ==========================================
-    //  8. Обработчик смены activity
+    //  7. Обработчик смены activity
     // ==========================================
     function onActivityChange() {
         if (isMainPage()) {
-            processAllSections();
+            hideAndReorder();
             startObserver();
-            retryProcess(30); // 30 × 500ms = 15 сек
+            startRetry();
         } else {
             stopObserver();
+            stopRetry();
         }
     }
 
     // ==========================================
-    //  9. Запуск плагина
+    //  8. Запуск плагина
     // ==========================================
     function start() {
-        // Регистрируем секцию «Позже»
         registerWatchLaterRow();
 
-        // Слушаем переходы между страницами
         Lampa.Listener.follow('activity', function (e) {
             if (e.type === 'start' || e.type === 'complite') {
-                setTimeout(onActivityChange, 300);
+                setTimeout(onActivityChange, 200);
             }
         });
 
-        // Если уже на Главной — обработать сразу
-        setTimeout(onActivityChange, 500);
+        // Если уже на Главной
+        setTimeout(onActivityChange, 300);
     }
 
     // ==========================================
-    //  10. Инициализация
+    //  9. Инициализация
     // ==========================================
     if (window.appready) {
         start();
