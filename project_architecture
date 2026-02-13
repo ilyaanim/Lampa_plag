@@ -11,9 +11,49 @@ Plugin for Lampa.mx that changes the Full Detail View (movie page) layout:
 - Date/country badge on poster (next to TV badge)
 
 ## Files
-- `wide_covers.js` — Main plugin file (self-contained, single JS file)
+- `wide_covers.js` — Wide covers plugin (cinematic Full Detail View layout)
+- `new_main_menu.js` — Main menu plugin (reorganizes Главная page sections)
 - `project_architecture` — This file, project documentation
 - `README.md` — Installation and usage instructions
+
+## New Main Menu Plugin (new_main_menu.js)
+
+### Target: Главная (Main) page
+Reorganizes sections on the main page:
+- Shows only "Продолжить просмотр" (Continue watching) and "Позже" (Watch later)
+- All other sections (trending, popular, genres, etc.) are hidden
+
+### How it works:
+1. **Register "Позже" section** via `Lampa.ContentRows.add()` at index 2
+   - Fetches items from `Lampa.Favorite.get({type: 'wath'})` (Watch later bookmarks)
+   - Displays up to 20 cards
+2. **Hide unwanted sections** — finds all `.items-line` elements, checks title text
+   - Allowed titles (partial match): "Продолжить", "Позже", "Continue", "Watch later"
+   - Everything else gets `display: none`
+3. **Async handling** — sections load asynchronously from TMDB API, so:
+   - Retry loop (30 attempts × 500ms = 15 sec) on page load
+   - MutationObserver on `.scroll__body` catches late-loading sections
+   - Processes on both `activity:start` and `activity:complite` events
+4. **Page detection** — only runs when `Lampa.Activity.active().component === 'main'`
+   - Observer disconnects when navigating away from Главная
+
+### Lampa internals used:
+- `Lampa.ContentRows.add()` — register custom section on main/category screens
+- `Lampa.Favorite.get({type: 'wath'})` — get Watch Later bookmarks
+- `Lampa.Activity.active()` — check current page (component === 'main')
+- `Lampa.Listener.follow('activity', ...)` — listen for page navigation
+- `Lampa.Listener.follow('app', ...)` — wait for app ready
+
+### DOM structure (Главная):
+```
+.scroll__body
+  .items-line                          ← section container
+    .items-line__title                 ← section title text
+    .items-line__body
+      .items-cards.mapping--line       ← horizontal scroll with cards
+  .items-line                          ← next section
+    ...
+```
 
 ## Plugin Structure (wide_covers.js)
 
