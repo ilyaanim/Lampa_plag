@@ -10,6 +10,8 @@
     //  Всё остальное — скрыто.
     // ==========================================
 
+    var processing = false;
+
     // ==========================================
     //  1. Определить, находимся ли мы на Главной
     // ==========================================
@@ -66,55 +68,114 @@
     }
 
     // ==========================================
-    //  4. Скрыть ненужные + переставить порядок
-    //     Вызывается многократно (retry), поэтому
-    //     каждый раз пересканирует все секции.
+    //  4. Принудительно триггерить видимость
+    //     секции после DOM-перестановки.
+    //     Lampa рендерит карточки только когда
+    //     секция попадает в viewport (lazy load).
+    // ==========================================
+    function forceVisible(section) {
+        if (!section) return;
+        try {
+            // Dispatch 'visible' event — Lampa Line слушает его
+            // для рендеринга карточек внутри секции
+            section.dispatchEvent(new CustomEvent('visible'));
+        } catch (e) {}
+        try {
+            // Также триггерим на внутренних элементах
+            var body = section.querySelector('.items-line__body');
+            if (body) body.dispatchEvent(new CustomEvent('visible'));
+            var cards = section.querySelector('.items-cards');
+            if (cards) cards.dispatchEvent(new CustomEvent('visible'));
+        } catch (e) {}
+        try {
+            // Layer.visible — Lampa пересчитывает видимость
+            if (window.Lampa && Lampa.Layer && Lampa.Layer.visible) {
+                Lampa.Layer.visible(section);
+            }
+        } catch (e) {}
+    }
+
+    // ==========================================
+    //  5. Скрыть ненужные + переставить порядок
+    //     + триггернуть видимость
     // ==========================================
     function hideAndReorder() {
         if (!isMainPage()) return;
+        if (processing) return;
+        processing = true;
 
-        var sections = document.querySelectorAll('.items-line');
-        if (!sections.length) return;
+        try {
+            var sections = document.querySelectorAll('.items-line');
+            if (!sections.length) return;
 
-        var continueSection = null;
-        var laterSection = null;
-        var parent = null;
+            var continueSection = null;
+            var laterSection = null;
+            var parent = null;
+            var needsReorder = false;
 
-        for (var i = 0; i < sections.length; i++) {
-            var section = sections[i];
-            var text = getSectionTitle(section);
+            // Фаза 1: скрыть лишние, найти нужные
+            for (var i = 0; i < sections.length; i++) {
+                var section = sections[i];
+                var text = getSectionTitle(section);
 
-            if (isContinueTitle(text)) {
-                continueSection = section;
-                section.style.display = '';
-                if (!parent) parent = section.parentNode;
-            } else if (isLaterTitle(text)) {
-                laterSection = section;
-                section.style.display = '';
-                if (!parent) parent = section.parentNode;
-            } else {
-                section.style.display = 'none';
+                if (isContinueTitle(text)) {
+                    continueSection = section;
+                    section.style.display = '';
+                    if (!parent) parent = section.parentNode;
+                } else if (isLaterTitle(text)) {
+                    laterSection = section;
+                    section.style.display = '';
+                    if (!parent) parent = section.parentNode;
+                } else {
+                    section.style.display = 'none';
+                }
             }
-        }
 
-        if (!parent) return;
+            if (!parent) return;
 
-        // --- Переставляем DOM-порядок ---
-        // Сначала ставим «Позже» в начало контейнера,
-        // потом «Продолжить» перед ним.
-        // Итого: Продолжить → Позже → (скрытое)
-        if (laterSection && laterSection.parentNode === parent) {
-            parent.insertBefore(laterSection, parent.firstChild);
-        }
-        if (continueSection && continueSection.parentNode === parent) {
-            parent.insertBefore(continueSection, parent.firstChild);
+            // Фаза 2: проверить нужна ли перестановка
+            // Ищем первый видимый элемент
+            var firstVisible = parent.firstElementChild;
+            while (firstVisible && firstVisible.style.display === 'none') {
+                firstVisible = firstVisible.nextElementSibling;
+            }
+
+            if (continueSection && firstVisible !== continueSection) {
+                needsReorder = true;
+            } else if (!continueSection && laterSection && firstVisible !== laterSection) {
+                needsReorder = true;
+            }
+
+            // Фаза 3: переставить если нужно
+            if (needsReorder) {
+                if (laterSection && laterSection.parentNode === parent) {
+                    parent.insertBefore(laterSection, parent.firstChild);
+                }
+                if (continueSection && continueSection.parentNode === parent) {
+                    parent.insertBefore(continueSection, parent.firstChild);
+                }
+            }
+
+            // Фаза 4: принудительная видимость
+            // (вызываем всегда — карточки могли не загрузиться)
+            setTimeout(function () {
+                forceVisible(continueSection);
+                forceVisible(laterSection);
+                // Layer.update пересчитает позиции
+                try {
+                    if (window.Lampa && Lampa.Layer && Lampa.Layer.update) {
+                        Lampa.Layer.update();
+                    }
+                } catch (e) {}
+            }, 50);
+
+        } finally {
+            processing = false;
         }
     }
 
     // ==========================================
-    //  5. Retry-цикл — секции грузятся асинхронно
-    //     «Продолжить просмотр» может появиться
-    //     позже «Позже», поэтому проверяем долго.
+    //  6. Retry-цикл — секции грузятся асинхронно
     // ==========================================
     var retryTimer = null;
 
@@ -144,8 +205,9 @@
     }
 
     // ==========================================
-    //  6. MutationObserver — ловим секции
-    //     которые добавляются при подгрузке
+    //  7. MutationObserver — ловим новые секции
+    //     (только прямые потомки, без subtree,
+    //      чтобы forceVisible не вызывал рекурсию)
     // ==========================================
     var observer = null;
 
@@ -164,7 +226,9 @@
             hideAndReorder();
         });
 
-        observer.observe(target, { childList: true, subtree: true });
+        // childList без subtree — ловим только добавление новых секций,
+        // не реагируем на рендер карточек внутри секций
+        observer.observe(target, { childList: true, subtree: false });
     }
 
     function stopObserver() {
@@ -175,7 +239,7 @@
     }
 
     // ==========================================
-    //  7. Обработчик смены activity
+    //  8. Обработчик смены activity
     // ==========================================
     function onActivityChange() {
         if (isMainPage()) {
@@ -189,7 +253,7 @@
     }
 
     // ==========================================
-    //  8. Запуск плагина
+    //  9. Запуск плагина
     // ==========================================
     function start() {
         registerWatchLaterRow();
@@ -205,7 +269,7 @@
     }
 
     // ==========================================
-    //  9. Инициализация
+    //  10. Инициализация
     // ==========================================
     if (window.appready) {
         start();
